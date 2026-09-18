@@ -190,16 +190,17 @@ with the official generator.
 - Exit with `0` on success, `1` on project-creation failure, and `2` on command
   argument errors. A Git warning still results in success.
 
-## Agreed failure-testing seam
+## Filesystem operations and failure testing
 
 - Test normal creation through temporary directories and the real filesystem.
-- Allow the creation operation to receive a small filesystem-operation
-  interface. Production supplies the real implementation; tests supply a
-  substitute that fails a selected operation deterministically.
-- Use this seam to exercise partial-write rollback and README symbolic-link
-  fallback, including failure of the fallback copy and of cleanup itself.
-- Keep the interface scoped to operations required by project creation; do not
-  introduce a general virtual filesystem or a dependency-injection framework.
+- Call `moonbitlang/async/fs` directly. The previously used injectable
+  filesystem interface was removed at the user's request.
+- Exercise rollback with a valid project name that exceeds the filesystem's
+  filename component limit. Earlier template files are created before this
+  failure; verify cleanup for both absent and originally empty destinations.
+- Keep the created-path journal and record files before writing their contents.
+- Do not retain substitute operations solely to force partial-write, symlink,
+  copy, permission, or cleanup failures in tests.
 - Do not add production CLI options or environment variables for fault injection.
 
 ## Platform API findings

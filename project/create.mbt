@@ -19,25 +19,29 @@ priv enum CreatedPath {
 }
 
 ///|
-async fn ensure_directory(
-  path : String,
-  filesystem : FileSystem,
-  created : Array[CreatedPath],
-) -> Unit {
-  match (filesystem.kind)(path) {
+async fn existing_kind(path : String) -> @fs.FileKind? {
+  Some(@fs.kind(path, follow_symlink=false)) catch {
+    @os_error.OSError(_) as err if err.is_ENOENT() => None
+    err => raise err
+  }
+}
+
+///|
+async fn ensure_directory(path : String, created : Array[CreatedPath]) -> Unit {
+  match existing_kind(path) {
     Some(Directory | SymLink) => return
     Some(_) => raise CreationError("Not a directory: \{path}")
     None => ()
   }
   let parent = @path.Path(path).dirname().to_string()
   if parent != path && parent != "" {
-    ensure_directory(parent, filesystem, created)
+    ensure_directory(parent, created)
   }
   // Creating an ancestor may have made a `..` component resolvable.
-  if (filesystem.kind)(path) is Some(Directory | SymLink) {
+  if existing_kind(path) is Some(Directory | SymLink) {
     return
   }
-  (filesystem.mkdir)(path)
+  @fs.mkdir(path, permission=0o777)
   created.push(Directory(path))
 }
 
@@ -45,24 +49,25 @@ async fn ensure_directory(
 async fn write_new(
   path : String,
   content : String,
-  filesystem : FileSystem,
   created : Array[CreatedPath],
 ) -> Unit {
-  let file = (filesystem.create)(path)
+  let file = @fs.open(
+    path,
+    mode=WriteOnly,
+    create_mode=CreateNew,
+    permission=0o666,
+  )
   created.push(File(path))
-  defer (file.close)()
-  (file.write)(content)
+  defer file.close()
+  file.write(content)
 }
 
 ///|
-async fn check_destination(
-  destination : String,
-  filesystem : FileSystem,
-) -> Unit {
-  match (filesystem.kind)(destination) {
+async fn check_destination(destination : String) -> Unit {
+  match existing_kind(destination) {
     None => ()
     Some(Directory) =>
-      if !(filesystem.entries)(destination).is_empty() {
+      if !@fs.readdir(destination, include_hidden=true).is_empty() {
         raise CreationError("Destination is not empty: \{destination}")
       }
     Some(_) =>
@@ -73,13 +78,11 @@ async fn check_destination(
 }
 
 ///|
-/// Create only in an absent or empty directory. The supplied filesystem is the
-/// agreed fault-injection boundary; normal callers use the real implementation.
+/// Create only in an absent or empty directory.
 pub async fn create(
   destination : String,
   user? : String,
   name? : String,
-  filesystem? : FileSystem = FileSystem::real(),
 ) -> CreatedProject {
   let warnings : Array[String] = []
   let username = match user {
@@ -90,25 +93,21 @@ pub async fn create(
   validate_names(username, name, warnings)
   let entries = @template.render(username, name)
   let destination = destination_path(destination)
-  check_destination(destination, filesystem)
+  check_destination(destination)
   let created : Array[CreatedPath] = []
   try {
-    ensure_directory(destination, filesystem, created)
+    ensure_directory(destination, created)
     // Missing ancestors can initially hide an existing target behind `..`.
     // Recheck its resolved eligibility before writing any template files.
-    check_destination(destination, filesystem)
+    check_destination(destination)
     for entry in entries {
       match entry {
         File(path~, content~, executable~) => {
           let path = join_path(destination, path)
-          ensure_directory(
-            @path.Path(path).dirname().to_string(),
-            filesystem,
-            created,
-          )
-          write_new(path, content, filesystem, created)
+          ensure_directory(@path.Path(path).dirname().to_string(), created)
+          write_new(path, content, created)
           if executable && !(@async.platform is Windows) {
-            (filesystem.chmod)(path, 0o755) catch {
+            @fs.chmod(path, 0o755) catch {
               err => warnings.push("Could not make \{path} executable: \{err}")
             }
           }
@@ -116,7 +115,7 @@ pub async fn create(
         Link(path~, target~) => {
           let path = join_path(destination, path)
           try {
-            (filesystem.symlink)(path, target)
+            @fs.symlink(target~, path, force_symlink=true)
             created.push(File(path))
           } catch {
             err => {
@@ -134,7 +133,7 @@ pub async fn create(
               guard content is Some(text) else {
                 raise CreationError("Missing bundled link target: \{target}")
               }
-              write_new(path, text, filesystem, created)
+              write_new(path, text, created)
             }
           }
         }
@@ -146,8 +145,8 @@ pub async fn create(
       for entry in created.rev_iter() {
         try {
           match entry {
-            File(path) => (filesystem.remove)(path)
-            Directory(path) => (filesystem.rmdir)(path)
+            File(path) => @fs.remove(path)
+            Directory(path) => @fs.rmdir(path)
           }
         } catch {
           cleanup_error => {

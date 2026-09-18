@@ -1,12 +1,8 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "moonbit-community/moon-new/project"
 
-import {
-  "moonbitlang/async/fs",
-}
-
 // Values
-pub async fn create(String, user? : String, name? : String, filesystem? : FileSystem) -> CreatedProject
+pub async fn create(String, user? : String, name? : String) -> CreatedProject
 
 // Errors
 pub(all) suberror CreationError {
@@ -23,23 +19,6 @@ pub struct CreatedProject {
   warnings : Array[String]
   git_stdout : String
   git_stderr : String
-}
-
-pub(all) struct FileSystem {
-  kind : async (String) -> @fs.FileKind?
-  entries : async (String) -> Array[String]
-  mkdir : async (String) -> Unit
-  create : async (String) -> OutputFile
-  symlink : async (String, String) -> Unit
-  chmod : async (String, Int) -> Unit
-  remove : async (String) -> Unit
-  rmdir : async (String) -> Unit
-}
-pub fn FileSystem::real() -> Self
-
-pub(all) struct OutputFile {
-  write : async (String) -> Unit
-  close : () -> Unit
 }
 
 // Type aliases

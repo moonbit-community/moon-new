@@ -18,8 +18,8 @@ Validation date: 2026-09-18. Platform: macOS ARM64.
 | Check | Result |
 | --- | --- |
 | Native and Wasm typechecking with `--deny-warn` | Passed |
-| MoonBit tests, native | 25 passed, including CLI and package acceptance |
-| MoonBit tests, Wasm | 11 passed |
+| MoonBit tests, native | 20 passed, including CLI and package acceptance |
+| MoonBit tests, Wasm | 6 passed |
 | CLI acceptance, native | 13 reported passed; Windows-only case returns early |
 | CLI acceptance, Wasm CLI with native harness | 13 reported passed; Windows-only case returns early |
 | Packaged assets, regenerated constants, local installation | Passed |
@@ -31,8 +31,8 @@ tests. CI invokes the MoonBit commands directly. The native acceptance harness
 launches either the native CLI or its Wasm artifact in a real child process.
 Platform-specific cases print a `SKIP` message and return early; MoonBit counts
 these as passed, so the reported totals do not mean Windows assertions ran.
-The existing project suite also includes a Windows-only guarded-drive test
-which returns without exercising its assertions on macOS. The Windows path fixes have source
+The project suite also includes a Windows-only pure path-joining test
+which does not exercise its assertions on macOS. The Windows path fixes have source
 review and CI tests, not a claimed local Windows execution. Raw upstream
 trailing whitespace is preserved through narrow `.gitattributes` exceptions.
 
@@ -50,8 +50,9 @@ The local spec files were used directly; no external issue tracker was needed.
 ### Standards
 
 No actionable documented-standard violations or judgement-based smells found.
-The approved filesystem seam, package boundaries, and bundled template storage
-match the agreed constraints.
+At the initial review, the filesystem seam, package boundaries, and bundled
+template storage matched the agreed constraints. The filesystem seam was
+subsequently removed at the user's request.
 
 ### Spec
 
@@ -79,9 +80,14 @@ and link assertions use the host `sh`, `stat`, and `readlink`; no additional
 MoonBit library dependencies were introduced for the test migration.
 
 The CI workflow defines macOS ARM64, Linux x86_64, and Windows x86_64 jobs, each
-covering native and Wasm. Tests use the real filesystem and external CLI. The
-approved filesystem seam injects partial writes, symlink/copy failures, cleanup
-failures, and an independently created file after preflight.
+covering native and Wasm. Tests use the real filesystem and external CLI.
+After removal of the injectable filesystem interface, rollback is tested by
+exceeding the host's filename component limit after earlier template entries
+have been written. Both absent destinations with new ancestors and originally
+empty destinations are covered. The former tests injecting partial writes,
+symlink/copy failures, permission failures, cleanup failures, and a file race
+were removed; those injected failure paths are no longer exercised by this
+suite. The rollback implementation and README copy fallback remain in place.
 
 ## Remaining delivery checks
 
