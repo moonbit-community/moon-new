@@ -1,0 +1,8 @@
+_build/
+target/
+.mooncakes/
+.moonagent/
+.DS_Store
+tests/
+docs/
+!template/assets/**

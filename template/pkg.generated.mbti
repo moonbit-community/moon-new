@@ -1,0 +1,17 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moon-new/template"
+
+// Values
+pub fn render(String, String) -> Array[Entry]
+
+// Errors
+
+// Types and methods
+pub(all) enum Entry {
+  File(path~ : String, content~ : String, executable~ : Bool)
+  Link(path~ : String, target~ : String)
+}
+
+// Type aliases
+
+// Traits

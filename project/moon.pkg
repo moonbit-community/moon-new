@@ -1,0 +1,15 @@
+import {
+  "moonbit-community/moon-new/template",
+  "moonbit-community/charclass/unicode",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x/path",
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/os_error",
+  "moonbitlang/async/process",
+}
+
+options(
+  supported_targets: "wasm + native",
+)

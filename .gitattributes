@@ -1,0 +1,4 @@
+* text=auto eol=lf
+# Preserve the exact upstream template, including its trailing whitespace.
+template/assets/** whitespace=-blank-at-eol,-blank-at-eof
+template/*.generated.mbt whitespace=-blank-at-eol
