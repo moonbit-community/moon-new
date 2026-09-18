@@ -31,4 +31,21 @@ jobs:
           irm https://cli.moonbitlang.com/install/powershell.ps1 | iex
           "$env:USERPROFILE\.moon\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Validate both backends and the package archive
-        run: python tests/ci.py
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            macOS) test "$(uname -m)" = arm64 ;;
+            *) test "$(uname -m)" = x86_64 ;;
+          esac
+          moon version --all
+          moon update
+          for target in native wasm; do
+            moon check --target "$target" --deny-warn
+            moon build --target "$target"
+          done
+          moon test --target native
+          moon test --target wasm
+          MOON_NEW_TEST_TARGET=wasm moon test tests/cli_test.mbt --target native
+          moon info
+          moon fmt
+          git diff --exit-code

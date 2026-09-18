@@ -18,16 +18,21 @@ Validation date: 2026-09-18. Platform: macOS ARM64.
 | Check | Result |
 | --- | --- |
 | Native and Wasm typechecking with `--deny-warn` | Passed |
-| MoonBit tests, native | 11 passed |
+| MoonBit tests, native | 25 passed, including CLI and package acceptance |
 | MoonBit tests, Wasm | 11 passed |
-| CLI acceptance, native | 12 passed, 1 Windows-only case skipped |
-| CLI acceptance, Wasm | 12 passed, 1 Windows-only case skipped |
+| CLI acceptance, native | 13 reported passed; Windows-only case returns early |
+| CLI acceptance, Wasm CLI with native harness | 13 reported passed; Windows-only case returns early |
 | Packaged assets, regenerated constants, local installation | Passed |
 | Generated project check/test/run | Passed; 0 starter tests; output `Hello` |
 | `moon info`, `moon fmt`, staged whitespace check | Passed |
 
-The MoonBit suite includes a Windows-only guarded-drive test which returns
-without exercising its assertions on macOS. The Windows path fixes have source
+All test code is MoonBit, including the CLI and archive/install acceptance
+tests. CI invokes the MoonBit commands directly. The native acceptance harness
+launches either the native CLI or its Wasm artifact in a real child process.
+Platform-specific cases print a `SKIP` message and return early; MoonBit counts
+these as passed, so the reported totals do not mean Windows assertions ran.
+The existing project suite also includes a Windows-only guarded-drive test
+which returns without exercising its assertions on macOS. The Windows path fixes have source
 review and CI tests, not a claimed local Windows execution. Raw upstream
 trailing whitespace is preserved through narrow `.gitattributes` exceptions.
 
@@ -56,6 +61,12 @@ Both were fixed and covered by regression tests. Follow-up review found no
 remaining actionable spec issues. Final Wasm validation rebuilt the artifact
 before running the regression tests.
 
+The subsequent test migration was reviewed against `dbcd1e5`. Standards review
+found no actionable violations or smells. Spec review confirmed all 13 CLI
+cases and the archive/regeneration/install/run flow were retained, with no
+actionable findings. On Windows, link validation compares the resolved target;
+Unix additionally checks the literal link text with `readlink`.
+
 ## Packaging evidence
 
 The archive check packages the module, checks all 14 source assets and generated
@@ -63,6 +74,9 @@ constants, extracts the archive into a temporary directory, deletes generated
 constants, and installs from that source. It then verifies the installed command
 name and checks, tests, and runs a generated project. This exercises application
 `dev_build` behavior and does not publish to Mooncakes.
+Extraction uses the host `unzip` on Unix and `tar` on Windows. Unix permission
+and link assertions use the host `sh`, `stat`, and `readlink`; no additional
+MoonBit library dependencies were introduced for the test migration.
 
 The CI workflow defines macOS ARM64, Linux x86_64, and Windows x86_64 jobs, each
 covering native and Wasm. Tests use the real filesystem and external CLI. The
