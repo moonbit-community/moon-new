@@ -3,6 +3,7 @@ import {
   "moonbitlang/async",
   "moonbitlang/core/argparse",
   "moonbitlang/async/stdio",
+  "moonbitlang/async/os_error",
   "moonbitlang/x/sys",
 }
 

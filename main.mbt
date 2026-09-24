@@ -30,9 +30,19 @@ async fn main {
   let user = matches.values.get("user").map(values => values[0])
   let name = matches.values.get("name").map(values => values[0])
   let quiet = matches.flags.get("quiet").unwrap_or(false)
-  let result = @project.create(destination, user?, name?) catch {
+  let warnings : Array[String] = []
+  let result = @project.create(destination, user?, name?, warnings~) catch {
     error => {
-      @stdio.stderr.write("Error: \{error}\n")
+      for warning in warnings {
+        @stdio.stderr.write("Warning: \{warning}\n")
+      }
+      match error {
+        @os_error.OSError(_) =>
+          @stdio.stderr.write(
+            "Error: Could not create project at \{destination}.\nCaused by: \{error}\n",
+          )
+        _ => @stdio.stderr.write("Error: \{error}\n")
+      }
       @sys.exit(1)
       return
     }

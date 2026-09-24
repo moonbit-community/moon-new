@@ -79,12 +79,13 @@ async fn check_destination(destination : String) -> Unit {
 
 ///|
 /// Create only in an absent or empty directory.
+/// Supply a warnings array to retain diagnostics even when creation fails.
 pub async fn create(
   destination : String,
   user? : String,
   name? : String,
+  warnings? : Array[String] = [],
 ) -> CreatedProject {
-  let warnings : Array[String] = []
   let username = match user {
     Some(user) => user
     None => existing_username(warnings).unwrap_or("username")

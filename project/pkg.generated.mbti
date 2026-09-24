@@ -2,7 +2,7 @@
 package "moonbit-community/moon-new/project"
 
 // Values
-pub async fn create(String, user? : String, name? : String) -> CreatedProject
+pub async fn create(String, user? : String, name? : String, warnings? : Array[String]) -> CreatedProject
 
 // Errors
 pub(all) suberror CreationError {

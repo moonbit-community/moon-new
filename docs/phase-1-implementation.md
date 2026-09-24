@@ -187,6 +187,14 @@ with the official generator.
   mode suppresses successful initialization output. A Git failure is reported
   as a warning and does not roll back a successfully generated project.
 - Write help and success messages to stdout; warnings and errors to stderr.
+- Keep warnings in encounter order and print them before a later creation error,
+  including in quiet mode. The CLI supplies the warning array to `create` so it
+  remains available when creation raises an error.
+- Credential parse/schema warnings suggest `moon login` or `--user`, without
+  exposing credential contents. CLI filesystem errors identify the destination
+  before displaying the original cause; preserve the underlying error type in
+  the creation API. Do not parse library error strings or use internal APIs
+  solely to change their formatting.
 - Exit with `0` on success, `1` on project-creation failure, and `2` on command
   argument errors. A Git warning still results in success.
 

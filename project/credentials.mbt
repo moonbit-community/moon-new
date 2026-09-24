@@ -30,7 +30,9 @@ async fn existing_username(warnings : Array[String]) -> String? {
   try {
     let value = @json.parse(file.read_all().text())
     guard value is { "token": String(_), .. } else {
-      warnings.push("Invalid credentials fields; using default username.")
+      warnings.push(
+        "Invalid credentials fields; using default username. Log in again with moon login or pass --user.",
+      )
       return None
     }
     match value {
@@ -38,7 +40,9 @@ async fn existing_username(warnings : Array[String]) -> String? {
       { "username": Null, .. } => None
       { "username"? : None, .. } => None
       _ => {
-        warnings.push("Invalid credentials fields; using default username.")
+        warnings.push(
+          "Invalid credentials fields; using default username. Log in again with moon login or pass --user.",
+        )
         None
       }
     }
@@ -47,7 +51,7 @@ async fn existing_username(warnings : Array[String]) -> String? {
     // a credential document that may contain a registry token.
     _ => {
       warnings.push(
-        "Could not read or parse credentials; using default username.",
+        "Could not read or parse credentials; using default username. Log in again with moon login or pass --user.",
       )
       None
     }

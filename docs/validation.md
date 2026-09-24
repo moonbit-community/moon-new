@@ -1,11 +1,11 @@
 # Phase-one validation
 
-Validation date: 2026-09-18. Platform: macOS ARM64.
+Validation date: 2026-09-24. Platform: macOS ARM64.
 
 ## Recorded environment
 
-- Moon: `0.1.20260916 (e4f45e4)`.
-- Moonc: `v0.10.13+75bd53fc8-nightly`.
+- Moon: `0.1.20260920 (914d7da)`.
+- Moonc: `v0.10.14+7d59c7ec9 (2026-09-18)`.
 - Dependencies: async 0.22.1, x 0.5.5, charclass 0.1.4 (ucd 0.5.0),
   bobzhang/liquid 0.1.1. Liquid 0.1.1 was still the newest published version at
   implementation time. No general Liquid feature conformance is claimed.
@@ -18,10 +18,10 @@ Validation date: 2026-09-18. Platform: macOS ARM64.
 | Check | Result |
 | --- | --- |
 | Native and Wasm typechecking with `--deny-warn` | Passed |
-| MoonBit tests, native | 20 passed, including CLI and package acceptance |
+| MoonBit tests, native | 24 passed, including CLI and package acceptance |
 | MoonBit tests, Wasm | 6 passed |
-| CLI acceptance, native | 13 reported passed; Windows-only case returns early |
-| CLI acceptance, Wasm CLI with native harness | 13 reported passed; Windows-only case returns early |
+| CLI acceptance, native | 17 reported passed; Windows-only case returns early |
+| CLI acceptance, Wasm CLI with native harness | 17 reported passed; Windows-only case returns early |
 | Packaged assets, regenerated constants, local installation | Passed |
 | Generated project check/test/run | Passed; 0 starter tests; output `Hello` |
 | `moon info`, `moon fmt`, staged whitespace check | Passed |
@@ -40,6 +40,16 @@ Git initialization failure was exercised through Git's own invalid default-branc
 configuration; absent Git through an empty child `PATH`. Both keep generated
 files and return success with warnings. Native and Wasm also pass the regression
 for a missing ancestor followed by `..` resolving to a populated destination.
+
+Diagnostic assertions compare complete application-owned messages for name and
+destination rejection, credential parsing/schema failures, and warnings before
+later failures. Both quiet and ordinary failure paths retain warnings. Invalid
+credentials never appear in output. Filesystem failures assert the project
+heading and cause ordering without fixing platform-specific OS reason text.
+The original library error remains on the cause line; the formatter does not
+use the library's internal errno-to-string API or parse its display strings.
+The rollback tests still assert the original `OSError` type after successful
+cleanup.
 
 ## Review
 
@@ -67,6 +77,10 @@ found no actionable violations or smells. Spec review confirmed all 13 CLI
 cases and the archive/regeneration/install/run flow were retained, with no
 actionable findings. On Windows, link validation compares the resolved target;
 Unix additionally checks the literal link text with `readlink`.
+
+The diagnostic cleanup was reviewed against `cd0c61a`. Both Standards and Spec
+reviews found no actionable issues. The change adds no error framework and
+retains the existing filesystem behavior and original-error propagation.
 
 ## Packaging evidence
 

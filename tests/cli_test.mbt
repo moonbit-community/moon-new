@@ -66,7 +66,10 @@ async test "CLI credentials and explicit user" {
   assert_false(result.stderr.contains("credentials"))
   let result = s.run(["fallback", "--quiet"])
   assert_eq(result.status, 0, msg=result.stderr)
-  assert_true(result.stderr.contains("Warning:"))
+  assert_eq(
+    result.stderr,
+    "Warning: Could not read or parse credentials; using default username. Log in again with moon login or pass --user.\n",
+  )
   assert_eq(result.stdout, "")
   assert_eq(s.read("fallback/README.mbt.md"), "# username/fallback")
   assert_false((result.stdout + result.stderr).contains("test-token"))
@@ -86,7 +89,7 @@ async test "CLI destinations and quiet output" {
     @fs.write_file(s.root + "/" + name + "/" + hidden, "keep me")
     let result = s.run([name, "--user", "tester"])
     assert_eq(result.status, 1)
-    assert_true(result.stderr.contains("not empty"))
+    assert_eq(result.stderr, "Error: Destination is not empty: \{name}\n")
     assert_eq(@fs.readdir(s.root + "/" + name, include_hidden=true), [hidden])
     assert_eq(s.read(name + "/" + hidden), "keep me")
   }
@@ -104,15 +107,30 @@ async test "CLI names and argument forms" {
   assert_eq(s.read("foo.bar/README.mbt.md"), "# 用户𐐀/foo")
   let result = s.run(["override", "--name=sample_test", "--user=tester", "-q"])
   assert_eq(result.status, 0, msg=result.stderr)
-  assert_true(result.stderr.contains("Warning:"))
+  assert_eq(
+    result.stderr,
+    "Warning: Project names ending in _test or _wbtest may conflict with test file conventions.\n",
+  )
   assert_eq(result.stdout, "")
   assert_true(s.exists("override/sample_test.mbt"))
   for user in ["", "a/b", "emoji😀", "a\u0345"] {
-    assert_eq(s.run(["invalid", "--user", user]).status, 1)
+    let result = s.run(["invalid", "--user", user])
+    assert_eq(result.status, 1)
+    assert_eq(
+      result.stderr,
+      "Error: Usernames can only contain Unicode alphanumeric characters, dashes (-), and underscores (_), and must not be empty.\n",
+    )
     assert_false(s.exists("invalid"))
   }
   for name in ["", "0hello", "a.b", "a/b", "用户"] {
-    assert_eq(s.run(["invalid", "--name", name, "--user", "tester"]).status, 1)
+    let result = s.run(["invalid", "--name", name, "--user", "tester"])
+    assert_eq(result.status, 1)
+    let expected = if name == "" {
+      "Project name must not be empty."
+    } else {
+      "Invalid project name: \{name}. Expected [A-Za-z_][A-Za-z0-9_-]*."
+    }
+    assert_eq(result.stderr, "Error: \{expected}\n")
     assert_false(s.exists("invalid"))
   }
   let result = s.run(["--user", "tester", "--name", "named", "--", "-directory"])
@@ -135,7 +153,15 @@ async test "CLI strict credential schema" {
     let name = "invalid_\{index}"
     let result = s.run([name, "-q"])
     assert_eq(result.status, 0, msg=result.stderr)
-    assert_true(result.stderr.contains("Warning:"))
+    let message = if index < 3 {
+      "Invalid credentials fields"
+    } else {
+      "Could not read or parse credentials"
+    }
+    assert_eq(
+      result.stderr,
+      "Warning: \{message}; using default username. Log in again with moon login or pass --user.\n",
+    )
     assert_false(result.stderr.contains("secret"))
     assert_eq(s.read(name + "/README.mbt.md"), "# username/" + name)
   }
@@ -300,5 +326,90 @@ async test "CLI help and argument errors" {
     assert_eq(result.status, 2)
     assert_true(result.stderr.contains("Error:"))
     assert_eq(@fs.readdir(s.root, include_hidden=true), [])
+  }
+}
+
+///|
+async test "CLI retains warnings before a validation error in either quiet mode" {
+  let s = Sandbox::new()
+  defer @fs.rmdir(s.root, recursive=true)
+  for quiet in [[], ["--quiet"]] {
+    let result = s.run(["invalid", "--name", "0bad"] + quiet)
+    assert_eq(result.status, 1)
+    assert_eq(result.stdout, "")
+    assert_eq(
+      result.stderr,
+      "Warning: Using default username. Log in with moon login or pass --user.\nError: Invalid project name: 0bad. Expected [A-Za-z_][A-Za-z0-9_-]*.\n",
+    )
+    assert_false(s.exists("invalid"))
+  }
+}
+
+///|
+async test "CLI keeps all warnings in order when the destination is rejected" {
+  let s = Sandbox::new()
+  defer @fs.rmdir(s.root, recursive=true)
+  @fs.mkdir(s.root + "/occupied")
+  @fs.write_file(s.root + "/occupied/keep", "original")
+  let result = s.run(["occupied", "--name", "sample_test", "-q"])
+  assert_eq(result.status, 1)
+  assert_eq(result.stdout, "")
+  assert_eq(
+    result.stderr,
+    "Warning: Using default username. Log in with moon login or pass --user.\nWarning: Project names ending in _test or _wbtest may conflict with test file conventions.\nError: Destination is not empty: occupied\n",
+  )
+  assert_eq(s.read("occupied/keep"), "original")
+  assert_eq(@fs.readdir(s.root + "/occupied", include_hidden=true), ["keep"])
+}
+
+///|
+async test "CLI credential diagnostics explain recovery without exposing credentials" {
+  let s = Sandbox::new()
+  defer @fs.rmdir(s.root, recursive=true)
+  @fs.mkdir(s.env["MOON_HOME"])
+  let credentials = s.env["MOON_HOME"] + "/credentials.json"
+  for
+    (document, message) in [
+      (
+        "{\"token\":\"do-not-print-token\",", "Could not read or parse credentials",
+      ),
+      (
+        "{\"token\":\"do-not-print-token\",\"username\":123}", "Invalid credentials fields",
+      ),
+      ("{\"username\":\"do-not-print-token\"}", "Invalid credentials fields"),
+    ] {
+    @fs.write_file(credentials, document)
+    let result = s.run(["invalid", "--name", "", "-q"])
+    assert_eq(result.status, 1)
+    assert_eq(result.stdout, "")
+    assert_eq(
+      result.stderr,
+      "Warning: \{message}; using default username. Log in again with moon login or pass --user.\nError: Project name must not be empty.\n",
+    )
+    assert_false(result.stderr.contains("do-not-print-token"))
+    assert_false(s.exists("invalid"))
+    let explicit = s.run(["invalid", "--user", "tester", "--name", ""])
+    assert_eq(explicit.status, 1)
+    assert_eq(explicit.stderr, "Error: Project name must not be empty.\n")
+  }
+}
+
+///|
+async test "CLI filesystem errors retain warnings, project context, and their cause" {
+  let s = Sandbox::new()
+  defer @fs.rmdir(s.root, recursive=true)
+  let name = "a".repeat(1024)
+  for quiet in [[], ["-q"]] {
+    let result = s.run(["broken", "--name", name] + quiet)
+    assert_eq(result.status, 1)
+    assert_eq(result.stdout, "")
+    // The OS cause is platform-dependent; our prefix and ordering are stable.
+    assert_true(
+      result.stderr.has_prefix(
+        "Warning: Using default username. Log in with moon login or pass --user.\nError: Could not create project at broken.\nCaused by: ",
+      ),
+    )
+    assert_true(result.stderr.contains(name + ".mbt"))
+    assert_false(s.exists("broken"))
   }
 }
