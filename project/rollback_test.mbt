@@ -14,9 +14,9 @@ async test "a real file creation failure removes output and newly created ancest
     )
     None
   } catch {
-    error => Some(error.to_string())
+    error => Some(error)
   }
-  assert_true(failure is Some(text) && text.contains("Could not create"))
+  assert_true(failure is Some(@os_error.OSError(_)))
   assert_eq(@fs.readdir(parent, include_hidden=true), [])
 }
 
@@ -28,9 +28,9 @@ async test "a real file creation failure retains an originally empty destination
     ignore(@project.create(destination, user="tester", name="a".repeat(1024)))
     None
   } catch {
-    error => Some(error.to_string())
+    error => Some(error)
   }
-  assert_true(failure is Some(text) && text.contains("Could not create"))
+  assert_true(failure is Some(@os_error.OSError(_)))
   assert_true(@fs.kind(destination) is Directory)
   assert_eq(@fs.readdir(destination, include_hidden=true), [])
 }

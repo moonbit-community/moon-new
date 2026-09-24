@@ -157,11 +157,11 @@ pub async fn create(
           }
         }
       }
-      let cleanup = if residual.is_empty() {
-        ""
-      } else {
-        "\nCleanup failed; paths may remain:\n" + residual.join("\n")
+      if residual.is_empty() {
+        raise error
       }
+      let cleanup = "\nCleanup failed; paths may remain:\n" +
+        residual.join("\n")
       raise CreationError("Could not create \{destination}: \{error}\{cleanup}")
     }
   }
