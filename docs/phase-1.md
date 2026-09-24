@@ -1,183 +1,92 @@
-# Phase 1: Default Project Creation
+# Phase 1: Default project creation
 
-Status: product design and implementation mechanisms agreed; implementation is
-present. See [the implementation plan](phase-1-implementation.md) and
-[validation status](validation.md). Public delivery and all three platform runs
-remain required for phase-one acceptance.
+Implemented locally; public delivery and the three-platform acceptance matrix
+remain incomplete. See [implementation](phase-1-implementation.md) and
+[validation](validation.md).
 
-## Agreed scope
+## Scope and reference
 
-- Implement default MoonBit project creation.
-- Defer Git repository templates and the `--template` option to a later phase.
-- Preserve compatibility with the official command's normal usage and default
-  generated project. Deliberate changes to edge-case behavior must be specified
-  and covered by acceptance cases.
-- Support macOS, Linux, and Windows. Each platform requires validation before
-  phase 1 is considered complete.
-- Distribute through Mooncakes under `moonbit-community/moon-new`, supporting
-  both direct execution with `moonx` and installation with `moon install`.
-- Separate downloadable executables and a GitHub Release pipeline are outside
-  phase 1.
+Provide default project creation through `moonbit-community/moon-new`.
+Git templates (`--template`), interactive mode, downloadable executables, and a
+GitHub Release pipeline are outside phase one.
 
-## Reference behavior
+The reference is Moon `e4f45e4`: [CLI](https://github.com/moonbitlang/moon/blob/e4f45e4/crates/moon/src/cli/new.rs),
+[generation](https://github.com/moonbitlang/moon/blob/e4f45e4/crates/moonbuild/src/new.rs),
+[template](https://github.com/moonbitlang/moon/blob/e4f45e4/crates/moonbuild/template/moon_new_template.toml),
+and [Git](https://github.com/moonbitlang/moon/blob/e4f45e4/crates/moonutil/src/git.rs).
+Compatibility covers normal usage and generated contents, subject to the explicit
+differences below; it does not require identical internals or diagnostic text.
 
-The inspected reference is `moon 0.1.20260916`, commit `e4f45e4`:
-
-- [Command arguments and naming](https://github.com/moonbitlang/moon/blob/e4f45e4/crates/moon/src/cli/new.rs)
-- [Project generation](https://github.com/moonbitlang/moon/blob/e4f45e4/crates/moonbuild/src/new.rs)
-- [Default template](https://github.com/moonbitlang/moon/blob/e4f45e4/crates/moonbuild/template/moon_new_template.toml)
-- [Git operations](https://github.com/moonbitlang/moon/blob/e4f45e4/crates/moonutil/src/git.rs)
-
-These sources describe the reference behavior, not a requirement to reproduce
-every implementation detail or edge case.
-
-## Default-template versioning
-
-- Use the inspected `e4f45e4` template as the initial fixed snapshot.
-- Bundle the snapshot with the program. Project generation does not fetch a
-  template or invoke an installed official `moon new`.
-- Upgrade the snapshot explicitly through reviewed repository changes and
-  compatibility tests; do not silently follow a moving upstream version.
-- Preserve the snapshot's complete file inventory, including agent guidance,
-  Git hook files, and Copilot setup workflow.
-- The generated project retains its official `cmd/main` executable package and
-  `preferred_target = "wasm"`, independently of this tool's own package layout.
-
-## Agreed creation behavior
-
-### Command-line interface
+## CLI and diagnostics
 
 ```text
 moon-new <PATH> [--user <USER>] [--name <NAME>] [-q | --quiet]
 moon-new -h | --help
 ```
 
-- The destination path is required for creation; there is no interactive mode.
-- Support `--user`, `--name`, `-h` / `--help`, and `-q` / `--quiet`.
-- Other options inherited from the official `moon` program, including
-  `--verbose`, `--trace`, `--target-dir`, and `--dry-run`, are out of scope and
-  must be rejected rather than silently ignored.
-- Quiet mode suppresses success messages and ordinary Git initialization output.
-  Warnings and errors remain visible.
-- Help and success messages go to stdout; warnings and errors go to stderr.
-  Exit codes are `0` for success, `1` for creation failure, and `2` for argument
-  errors. Warning-only Git failures retain exit code `0`.
+- Require a destination except for help. Reject unsupported options, including
+  `--template`, `--verbose`, `--trace`, `--target-dir`, and `--dry-run`.
+- Send help/success to stdout and warnings/errors to stderr. Quiet mode hides
+  success and ordinary Git initialization output, never warnings or errors.
+- Preserve warnings in encounter order before a later error. Credential parse
+  and schema failures suggest `moon login` or `--user` without exposing tokens.
+- Exit codes: `0` success (including Git warnings), `1` creation failure,
+  `2` argument error.
 
-### Naming compatibility
+## Names and credentials
 
-- Resolve the username from an explicit `--user`, then the local credentials
-  file's `username`, then the literal `username`.
-- An explicit `--user` skips credential lookup. Otherwise, use
-  `MOON_HOME/credentials.json`, falling back to `HOME/.moon/credentials.json`
-  on Unix or `USERPROFILE/.moon/credentials.json` on Windows when `MOON_HOME`
-  is unset. If the environment cannot establish that directory, warn and use
-  `username`; no system user-directory lookup is attempted. This environment-only
-  fallback is an explicitly accepted difference from the official command.
-  Parse it with `moonbitlang/core/json`; no network request or authenticated
-  session is required. Standard JSON is supported; the official command's
-  additional lenient syntax, including comments and trailing commas, is not.
-  Parse failures use the normal warning and username fallback behavior.
-  This is an explicitly accepted exception to exact credential syntax compatibility.
-- Accept a nonempty username consisting of charclass Unicode alphanumeric
-  characters, dashes, and underscores, without a local length limit.
-  The user accepted charclass's Letter-or-Number semantics, which differ from
-  the official Rust predicate for some alphabetic combining marks such as
-  U+0345. Track this upstream instead of adding a local compatibility table.
-- Resolve the project name from an explicit `--name`, otherwise from the
-  reference path `file_stem` behavior, including its `hello` fallback. For
-  example, directory `foo.bar` produces project name `foo`.
-- Validate project names against `[A-Za-z_][A-Za-z0-9_-]*`.
-- Names ending in `_test` or `_wbtest` produce a warning but are accepted.
-- The module identity is `<username>/<project-name>`; the destination directory
-  name is independent of an explicitly selected project name.
+- Username precedence: `--user`, credentials username, then `username`.
+  Explicit `--user` skips credential lookup entirely.
+- Read `MOON_HOME/credentials.json` if `MOON_HOME` is set, including empty or
+  relative values. Otherwise use `HOME/.moon/credentials.json` on Unix
+  (HOME may be empty), or nonempty `USERPROFILE/.moon/credentials.json` on
+  Windows. No OS home lookup or tilde expansion; unknown home warns and falls back.
+- Use strict JSON: string `token` required; string `username` optional, with
+  missing/null meaning absent. Missing files and read/parse/schema failures
+  warn and fall back; failure to open an existing file falls back silently.
+  Valid credentials without a username fall back silently. Never modify credentials.
+- Usernames must be nonempty charclass Unicode letters/numbers, `-`, or `_`,
+  without a local length limit. The accepted U+0345 difference from Rust is
+  tracked in [charclass #10](https://github.com/moonbit-community/charclass/issues/10).
+- Project names use `--name` or reference `file_stem` semantics (`foo.bar` →
+  `foo`, fallback `hello`), and must match `[A-Za-z_][A-Za-z0-9_-]*`.
+  `_test` and `_wbtest` suffixes warn but remain valid.
+- Module identity is `<username>/<project-name>`, independent of destination name.
+  Strict JSON, charclass semantics, and environment-only home lookup are accepted
+  compatibility differences; do not add local Unicode exceptions or lenient JSON.
 
-### Destination and failure cleanup
+## Creation and cleanup
 
-- Accept only a nonexistent destination or an existing empty directory.
-- Hidden entries count as contents. A directory containing `.git`, `.DS_Store`,
-  or an unrelated file is not an eligible destination.
-- Reject an ineligible destination without changing its contents.
-- Reject a destination that is itself a symbolic link, including a dangling
-  link. Follow parent-directory symbolic links normally and preserve `..`
-  traversal semantics. Missing ancestors may be created as needed.
-- On a file-generation failure handled by the program, restore the destination
-  to its original state: remove a newly created destination, or retain an
-  originally empty directory with no generated contents.
-- Forced process termination and power-loss recovery are outside this guarantee.
-- If cleanup itself fails, report the remaining paths instead of claiming that
-  restoration succeeded.
-- Cleanup may remove ancestors created by this invocation, but only while
-  empty; it does not remove pre-existing ancestors.
+- Bundle the complete `e4f45e4` snapshot, including guidance, hooks, and workflow.
+  Generate offline without fetching templates or invoking official `moon new`.
+  Snapshot updates require review and fixture updates. The generated project
+  retains `cmd/main` and preferred target `wasm`.
+- Accept only absent or completely empty destinations, including hidden entries.
+  Reject files and destination symlinks, including dangling links. Follow parent
+  symlinks and preserve OS traversal through `..`.
+  See the [destination decision](adr/0001-require-empty-destinations.md).
+- On handled generation failure, remove only recorded output and newly created
+  ancestors, keeping existing empty directories. Remove directories only when
+  empty; report cleanup failures and possible residual paths. Forced termination
+  and power-loss recovery are outside this guarantee.
+- Try `README.md` → `README.mbt.md`; if symlinking fails, copy identical content
+  and warn that a copy was used. Copies do not stay synchronized. Copy failure
+  triggers normal generation cleanup.
+- After generation, initialize Git unless already inside a working tree.
+  Missing/failing Git only warns. Do not stage, commit, add remotes, or enable hooks.
 
-See [the destination policy decision](adr/0001-require-empty-destinations.md).
+## Delivery acceptance
 
-### Git initialization
+Both `moonx moonbit-community/moon-new hello --user tester` and
+`moon install moonbit-community/moon-new` followed by `moon-new hello --user tester`
+must work in separate clean locations, without package suffixes or target flags.
+Verify help and missing-destination errors through both public entrypoints.
+A published version, registry Wasm asset, and successful native install are required;
+local installation alone does not establish public delivery.
 
-- After successful file generation, retain the official Git initialization
-  behavior: skip initialization inside an existing Git working tree, otherwise
-  attempt to initialize a repository.
-- Git being unavailable or initialization failing produces a warning, but does
-  not make project creation fail or trigger removal of the generated project.
-- Do not automatically stage files, create a commit, configure a remote, or
-  enable the generated Git hook.
-
-### README fallback
-
-- Attempt to create `README.md` as a symbolic link to `README.mbt.md`.
-- If symbolic link creation fails, fall back to an ordinary copy and report the
-  fallback. The copied files will not remain synchronized automatically.
-- Failure to create the fallback copy is a file-generation failure.
-
-## Distribution and platform acceptance
-
-The public module identity is `moonbit-community/moon-new`. Users must be able to
-create a project with either flow:
-
-```sh
-moonx moonbit-community/moon-new hello --user tester
-
-moon install moonbit-community/moon-new
-moon-new hello --user tester
-```
-
-Run the two examples in separate clean locations. Both flows must expose the
-same creation behavior; users must not need a `/cmd/main` package suffix or an
-explicit target flag. Supplying no destination still produces the agreed
-missing-argument error, and `--help` must work through either entrypoint.
-
-Registry delivery requires a published module version, an available prebuilt
-Wasm asset for `moonx`, and a successful native install. Local build or install
-checks do not by themselves complete this public distribution acceptance.
-
-Platform support follows the MoonBit toolchain. The initial acceptance matrix is:
-
-| Operating system | Architecture |
-| --- | --- |
-| macOS | ARM64 |
-| Linux | x86_64 |
-| Windows | x86_64 |
-
-Validate both the Wasm execution path and native executable on these platforms.
-Additional toolchain-supported architectures are not a separate binary-release
-commitment in phase 1 and must not be described as tested without evidence.
-
-## Acceptance coverage
-
-- The generated file inventory, file contents, symbolic link, and Unix executable
-  permission match the selected official template, except for the agreed README
-  fallback.
-- Explicit and default names, credential fallback, invalid names, and reserved
-  test-file suffixes follow the reference behavior, subject to the agreed
-  strict-JSON, charclass Unicode, and home-directory fallback differences.
-- Missing or unknown command-line arguments fail without creating a project;
-  help works without a destination.
-- Nonexistent and empty destinations succeed; populated destinations, including
-  those with only hidden entries, are rejected without changes.
-- Handled generation failures restore absent and empty destinations correctly.
-- Git initialization is skipped inside a working tree; unavailable or failing
-  Git produces a warning without failing creation.
-- README symbolic-link failure falls back to an identical ordinary copy;
-  failure of that copy triggers generation failure cleanup.
-- Quiet mode hides successful creation output but preserves diagnostics.
-- A generated project passes `moon check` and `moon test`, and its entry point
-  prints `Hello`. The default template contains no test cases.
+Validate native and Wasm on macOS ARM64, Linux x86_64, and Windows x86_64.
+Platform support follows the MoonBit toolchain; untested architectures are not
+verified, and phase one does not promise separately released binaries.
+Acceptance includes exact template inventory/bytes/link/Unix executable mode,
+the cases above, and a generated project passing `moon check`, `moon test`
+(zero starter tests), and `moon run cmd/main` with output `Hello`.

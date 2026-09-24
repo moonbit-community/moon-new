@@ -1,113 +1,50 @@
-# Phase-one validation
+# Validation
 
-Validation date: 2026-09-24. Platform: macOS ARM64.
+Last code validation: **2026-09-24, macOS ARM64**. Moon `0.1.20260920 (914d7da)`;
+moonc `v0.10.14+7d59c7ec9 (2026-09-18)`.
+Dependencies: async 0.22.1, x 0.5.5, charclass 0.1.4 (ucd 0.5.0), Liquid 0.1.1.
 
-## Recorded environment
-
-- Moon: `0.1.20260920 (914d7da)`.
-- Moonc: `v0.10.14+7d59c7ec9 (2026-09-18)`.
-- Dependencies: async 0.22.1, x 0.5.5, charclass 0.1.4 (ucd 0.5.0),
-  bobzhang/liquid 0.1.1. Liquid 0.1.1 was still the newest published version at
-  implementation time. No general Liquid feature conformance is claimed.
-- Template fixture: `tests/fixtures/official.json`, captured by the pinned
-  official `moon new` with username `tester` and name `hello`. It is independent
-  of the Liquid rendering implementation.
-
-## Checks
-
-| Check | Result |
+| Check | Recorded result |
 | --- | --- |
-| Native and Wasm typechecking with `--deny-warn` | Passed |
-| MoonBit tests, native | 24 passed, including CLI and package acceptance |
-| MoonBit tests, Wasm | 6 passed |
-| CLI acceptance, native | 17 reported passed; Windows-only case returns early |
-| CLI acceptance, Wasm CLI with native harness | 17 reported passed; Windows-only case returns early |
-| Packaged assets, regenerated constants, local installation | Passed |
-| Generated project check/test/run | Passed; 0 starter tests; output `Hello` |
-| `moon info`, `moon fmt`, staged whitespace check | Passed |
+| Native/Wasm check with `--deny-warn` | Passed |
+| Native tests, including CLI and package acceptance | 24 reported passed |
+| Wasm tests | 6 reported passed |
+| CLI acceptance per backend, using a native harness | 17 reported passed each |
+| Archive assets, regeneration, local installation | Passed |
+| Generated project check/test/run | Passed; zero starter tests; output `Hello` |
+| `moon info`, `moon fmt`, whitespace checks | Passed |
 
-All test code is MoonBit, including the CLI and archive/install acceptance
-tests. CI invokes the MoonBit commands directly. The native acceptance harness
-launches either the native CLI or its Wasm artifact in a real child process.
-Platform-specific cases print a `SKIP` message and return early; MoonBit counts
-these as passed, so the reported totals do not mean Windows assertions ran.
-The project suite also includes a Windows-only pure path-joining test
-which does not exercise its assertions on macOS. The Windows path fixes have source
-review and CI tests, not a claimed local Windows execution. Raw upstream
-trailing whitespace is preserved through narrow `.gitattributes` exceptions.
+Windows-only CLI and path-joining cases do not execute their assertions on macOS;
+the runner counts these as passed. These totals do not establish Windows support.
+Reproduction commands are in [README](../README.md#development).
 
-Git initialization failure was exercised through Git's own invalid default-branch
-configuration; absent Git through an empty child `PATH`. Both keep generated
-files and return success with warnings. Native and Wasm also pass the regression
-for a missing ancestor followed by `..` resolving to a populated destination.
+## Evidence and limits
 
-Diagnostic assertions compare complete application-owned messages for name and
-destination rejection, credential parsing/schema failures, and warnings before
-later failures. Both quiet and ordinary failure paths retain warnings. Invalid
-credentials never appear in output. Filesystem failures assert the project
-heading and cause ordering without fixing platform-specific OS reason text.
-The original library error remains on the cause line; the formatter does not
-use the library's internal errno-to-string API or parse its display strings.
-The rollback tests still assert the original `OSError` type after successful
-cleanup.
+- `tests/fixtures/official.json` independently captures Moon `e4f45e4` output
+  for `tester/hello`. It checks inventory, bytes, README link/copy, and Unix hook
+  mode. Windows link checks compare resolved destinations; Unix also checks
+  literal link text. Original template whitespace is intentionally preserved.
+- Real filesystem tests cover ordinary creation, filename-limit rollback,
+  existing empty-directory preservation, and `missing/../existing` rejection.
+  Successful rollback preserves the original `OSError` type.
+- CLI tests cover names, credentials, destination rules, symlinks, Unix umask,
+  Git reuse/failure, quiet mode, full stable diagnostic text, warning-before-error
+  order, and token secrecy. Missing Git uses an empty child PATH; initialization
+  failure uses Git's invalid default-branch configuration. OS reason text varies.
+- The package test verifies all 14 assets/constants, extracts the archive,
+  removes generated constants, installs locally, and checks regeneration,
+  installed command naming, and a generated project. This is not publication.
+- Removing the filesystem adapter also removed injected partial-write,
+  symlink/copy, chmod, cleanup-failure, and file-race tests. Those forced failure
+  paths are no longer exercised. README fallback and rollback remain implemented.
+- Standards/Spec reviews found no remaining actionable issues after correcting
+  `..` destination checks and Windows drive-relative joins. Diagnostic cleanup
+  was reviewed against `cd0c61a`. No general Liquid conformance is claimed.
 
-## Review
+## Remaining acceptance
 
-Baseline: `cade6e9a35230b6757ff8a222b411057ff2f86f0`. The code-review skill's two
-independent reviewers inspected staged changes against that initial commit.
-The local spec files were used directly; no external issue tracker was needed.
-
-### Standards
-
-No actionable documented-standard violations or judgement-based smells found.
-At the initial review, the filesystem seam, package boundaries, and bundled
-template storage matched the agreed constraints. The filesystem seam was
-subsequently removed at the user's request.
-
-### Spec
-
-The first pass found two path-handling defects: ancestors exposing a populated
-or symlink destination through `..`, and Windows drive-relative path joining.
-Both were fixed and covered by regression tests. Follow-up review found no
-remaining actionable spec issues. Final Wasm validation rebuilt the artifact
-before running the regression tests.
-
-The subsequent test migration was reviewed against `dbcd1e5`. Standards review
-found no actionable violations or smells. Spec review confirmed all 13 CLI
-cases and the archive/regeneration/install/run flow were retained, with no
-actionable findings. On Windows, link validation compares the resolved target;
-Unix additionally checks the literal link text with `readlink`.
-
-The diagnostic cleanup was reviewed against `cd0c61a`. Both Standards and Spec
-reviews found no actionable issues. The change adds no error framework and
-retains the existing filesystem behavior and original-error propagation.
-
-## Packaging evidence
-
-The archive check packages the module, checks all 14 source assets and generated
-constants, extracts the archive into a temporary directory, deletes generated
-constants, and installs from that source. It then verifies the installed command
-name and checks, tests, and runs a generated project. This exercises application
-`dev_build` behavior and does not publish to Mooncakes.
-Extraction uses the host `unzip` on Unix and `tar` on Windows. Unix permission
-and link assertions use the host `sh`, `stat`, and `readlink`; no additional
-MoonBit library dependencies were introduced for the test migration.
-
-The CI workflow defines macOS ARM64, Linux x86_64, and Windows x86_64 jobs, each
-covering native and Wasm. Tests use the real filesystem and external CLI.
-After removal of the injectable filesystem interface, rollback is tested by
-exceeding the host's filename component limit after earlier template entries
-have been written. Both absent destinations with new ancestors and originally
-empty destinations are covered. The former tests injecting partial writes,
-symlink/copy failures, permission failures, cleanup failures, and a file race
-were removed; those injected failure paths are no longer exercised by this
-suite. The rollback implementation and README copy fallback remain in place.
-
-## Remaining delivery checks
-
-- Linux and Windows execution have not been performed locally.
-- The repository has no configured Git remote, so the workflow has not been run
-  on a hosted CI service during this implementation.
-- No module version has been published. The exact public `moonx
-  moonbit-community/moon-new` and `moon install moonbit-community/moon-new`
-  entrypoints remain unverified until publication and registry Wasm availability.
+The CI workflow defines native/Wasm jobs for macOS ARM64, Linux x86_64, and
+Windows x86_64. Linux/Windows runs and hosted CI execution remain unverified;
+the repository has no configured remote. No module version has been published.
+Public `moonx moonbit-community/moon-new` and `moon install moonbit-community/moon-new`
+acceptance awaits publication, registry Wasm availability, and actual runs.
