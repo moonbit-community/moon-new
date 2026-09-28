@@ -12,6 +12,27 @@ _Avoid_: Hello template
 A Git repository selected as the source for a new project.
 _Avoid_: Template engine
 
+**Template root**:
+The directory within a template repository whose contents form the new project.
+It may be the repository root or a selected subdirectory.
+_Avoid_: Destination directory
+
+**Template file**:
+A file in a template repository whose contents are expanded to produce a project
+file, rather than copied unchanged.
+_Avoid_: Template repository
+
+**Built-in variable**:
+A named project value supplied by moon-new for use in template files and paths:
+the username or the project's short name. Template authors do not define
+additional variables.
+_Avoid_: Custom template parameter
+
+**Template configuration**:
+The template author's rules for selecting which file contents are expanded and
+which files or directories are omitted from the generated project.
+_Avoid_: Module configuration
+
 **Destination directory**:
 The filesystem location where the new project is created.
 _Avoid_: Module name

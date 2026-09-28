@@ -2,7 +2,8 @@
 
 Create a default MoonBit project using the bundled official starter template.
 The CLI lives in the root package and supports native and Wasm execution.
-Git repository templates (`--template`) are planned for a later phase.
+Git repository templates (`--template`) are being implemented in
+[phase two](docs/phase-2.md); the CLI option is not available yet.
 
 ## Usage
 
@@ -39,8 +40,10 @@ directory produces a warning and the default username. Names use charclass's
 Unicode letter/number categories plus `-` and `_`; some combining marks accepted
 by official Moon are not accepted here.
 
-Git initializes only after generation, unless the destination is already in a
-working tree. Missing or failing Git is a warning. README symlink failure falls
+Git initializes through the bit library after generation, unless the destination
+is already in a working tree. No Git executable is required. New repositories
+start on `main`; global Git configuration and `GIT_CONFIG_*` overrides are not
+read. Initialization failure is a warning. README symlink failure falls
 back to an ordinary copy with a warning. Quiet mode hides success output while
 retaining warnings and errors. Exit codes are 0 (success), 1 (creation failure),
 and 2 (argument errors).
@@ -60,6 +63,8 @@ moon build --target wasm
 moon test --target native
 moon test --target wasm
 MOON_NEW_TEST_TARGET=wasm moon test tests/cli_test.mbt --target native
+MOON_NEW_TEST_REMOTE=1 moon test repository/repository_test.mbt --target native
+MOON_NEW_TEST_REMOTE=1 moon test repository/repository_test.mbt --target wasm
 moon info && moon fmt
 ```
 
@@ -69,7 +74,10 @@ running them; `MOON_NEW_TEST_TARGET` selects the CLI backend under test, while
 the acceptance harness itself runs natively. In PowerShell, set
 `$env:MOON_NEW_TEST_TARGET = "wasm"` before the CLI test command and remove it
 afterward. The package test uses `unzip` on Unix and the system `tar` on Windows.
-Unix permission assertions use `sh`, `stat`, and `readlink`.
+Unix permission assertions use `sh`, `stat`, and `readlink`. Repository fixtures
+use Git to create independent committed inputs; production code does not invoke
+Git. Remote smoke tests access the public `octocat/Hello-World` repository and
+are skipped unless explicitly enabled.
 CI covers macOS ARM64, Linux x86_64, and Windows x86_64.
 Only platforms with a completed run should be described as verified.
 

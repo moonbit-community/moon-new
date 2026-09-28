@@ -1,5 +1,6 @@
 import {
   "moonbit-community/moon-new/template",
+  "moonbit-community/moon-new/repository",
   "moonbit-community/charclass/unicode",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
@@ -7,7 +8,6 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/fs",
   "moonbitlang/async/os_error",
-  "moonbitlang/async/process",
 }
 
 options(

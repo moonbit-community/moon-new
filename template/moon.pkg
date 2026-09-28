@@ -1,5 +1,9 @@
 import {
   "bobzhang/liquid",
+  "moonbit-community/moon-new/repository",
+  "mizchi/bit_lib" @git,
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
 }
 
 rule(
@@ -154,4 +158,8 @@ dev_build(
   rule: "asset_14",
   input: "assets/AGENTS.md",
   output: "asset_14.generated.mbt",
+)
+
+options(
+  supported_targets: "wasm + native",
 )

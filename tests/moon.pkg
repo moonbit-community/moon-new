@@ -1,4 +1,6 @@
 import {
+  "moonbit-community/moon-new/repository",
+  "moonbit-community/moon-new/template",
   "moonbitlang/async",
   "moonbitlang/async/fs",
   "moonbitlang/async/process",

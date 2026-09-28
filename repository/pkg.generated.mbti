@@ -1,0 +1,20 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moon-new/repository"
+
+// Values
+pub async fn initialize(String) -> Bool
+
+pub async fn load(String, branch? : String, tag? : String, rev? : String, subdir? : String) -> Array[Entry]
+
+// Errors
+
+// Types and methods
+pub(all) struct Entry {
+  path : String
+  mode : String
+  content : Bytes
+}
+
+// Type aliases
+
+// Traits

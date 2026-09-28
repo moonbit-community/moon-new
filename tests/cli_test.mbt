@@ -192,10 +192,10 @@ async test "CLI home lookup and unavailable Git" {
   s.env["PATH"] = ""
   let result = s.run(["no_git", "--user", "tester", "-q"])
   assert_eq(result.status, 0, msg=result.stderr)
-  assert_true(result.stderr.contains("git available"))
+  assert_eq(result.stderr, "")
   assert_eq(result.stdout, "")
   assert_true(s.exists("no_git/moon.mod"))
-  assert_false(s.exists("no_git/.git"))
+  assert_eq(s.read("no_git/.git/HEAD"), "ref: refs/heads/main\n")
 }
 
 ///|
@@ -258,7 +258,7 @@ async test "CLI permissions respect the Unix umask" {
 }
 
 ///|
-async test "CLI Git initialization failure keeps generated files" {
+async test "CLI library initialization is independent of Git command configuration" {
   let s = Sandbox::new()
   defer @fs.rmdir(s.root, recursive=true)
   s.env["GIT_CONFIG_COUNT"] = "1"
@@ -267,7 +267,8 @@ async test "CLI Git initialization failure keeps generated files" {
   let result = s.run(["git_failure", "--user", "tester", "-q"])
   assert_eq(result.status, 0, msg=result.stderr)
   assert_eq(result.stdout, "")
-  assert_true(result.stderr.contains("Git initialization failed"))
+  assert_eq(result.stderr, "")
+  assert_eq(s.read("git_failure/.git/HEAD"), "ref: refs/heads/main\n")
   assert_eq(s.read("git_failure/README.mbt.md"), "# tester/git_failure")
 }
 

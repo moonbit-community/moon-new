@@ -1,10 +1,22 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "moonbit-community/moon-new/template"
 
+import {
+  "moonbit-community/moon-new/repository",
+}
+
 // Values
 pub fn render(String, String) -> Array[Entry]
 
+pub fn select(Array[@repository.Entry], warnings? : Array[String]) -> Array[(@repository.Entry, Bool)] raise
+
 // Errors
+pub(all) suberror TemplateError {
+  TemplateError(String)
+}
+pub fn TemplateError::output(Self, &Logger) -> Unit
+pub fn TemplateError::to_string(Self) -> String
+pub impl Show for TemplateError
 
 // Types and methods
 pub(all) enum Entry {
