@@ -16,7 +16,8 @@ The module supports native and Wasm, with Wasm preferred. The generated
 starter's separate `cmd/main` layout is unchanged.
 
 Use core argparse/JSON, async filesystem/process APIs, and x/path. The user
-approved `bobzhang/liquid` and `moonbit-community/charclass`; versions live in
+approved Liquid engine (now `moonbit-community/liquid`) and
+`moonbit-community/charclass`; versions live in
 [moon.mod](../moon.mod). New non-official dependencies require confirmation.
 Keep cross-package APIs small, avoid `internal` packages and speculative
 frameworks, and call `@fs` directly. There is no injectable filesystem layer.

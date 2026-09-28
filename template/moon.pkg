@@ -1,5 +1,5 @@
 import {
-  "bobzhang/liquid",
+  "moonbit-community/liquid",
   "moonbit-community/moon-new/repository",
   "mizchi/bit_lib" @git,
   "moonbitlang/core/json",

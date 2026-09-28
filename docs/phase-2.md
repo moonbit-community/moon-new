@@ -1,7 +1,8 @@
 # Phase 2: Git repository templates
 
 Status: implementation authorized; repository access and file selection are
-implemented. CLI template generation is pending the published Liquid fix.
+implemented. Liquid is upgraded to `moonbit-community/liquid@0.2.0`;
+CLI template generation remains in progress.
 
 ## Confirmed direction
 
@@ -119,7 +120,7 @@ Its special `.liquid` handling and Cargo-specific metadata exclusions do not app
   It is not an injectable project-generation filesystem. Its timestamp method
   explicitly fails: the object/ref operations used here do not request mtimes.
 
-Pending: the published Liquid upgrade, strict rendering of contents/paths/link
+Pending: Git-template rendering of contents/paths/link
 targets, output-path validation and collisions, CLI options, binary output,
 directory-link fallback/rollback, and end-to-end template generation acceptance.
 The existing CLI still creates only the bundled default template.
@@ -129,11 +130,14 @@ invocation superseded by the library initialization described above.
 
 ## Dependency findings
 
-The installed `bobzhang/liquid` 0.1.1 returns an `[ERROR: ...]` string under its
-`Strict` policy instead of raising an error (`liquid.mbt`, `handle_error`).
-Q11 remains required. The user selected waiting for a published fix before
-updating the dependency; do not vendor unpublished code or infer errors from
-rendered text. Selecting `Strict` alone does not satisfy the requirement.
+The former dependency, `bobzhang/liquid` 0.1.1, returned an `[ERROR: ...]` string
+under its `Strict` policy instead of a structured failure. Following the user's
+decision to wait for publication, it has been replaced with
+`moonbit-community/liquid@0.2.0`. Its `compile` and `Template::render` APIs return
+`Result` values with diagnostics. The bundled renderer now propagates these as
+`TemplateError`, including the source path, phase, code, message, and available
+UTF-16 offset. No unpublished source is vendored and error-like output text is
+not interpreted as a failure. Q11 still requires Git-template integration.
 
 The current implementation uses `mizchi/bit_lib`, `bit_protocol`, `bit_repo`,
 `bit_object`, and `bit_types` version 0.48.0. Local and HTTPS
@@ -167,7 +171,7 @@ Pattern semantics were compared with cargo-generate's pinned `ignore` 0.4.33
 and `globset` 0.4.20 using a temporary Rust oracle (1,296 combinations), followed
 by focused regressions for review findings. Committed tests are all MoonBit.
 
-Validation on macOS: warning-free native/Wasm checks and builds, 36 native
-tests, 11 Wasm tests, 17 CLI tests against the Wasm executable, and anonymous
+Validation on macOS: warning-free native/Wasm checks and builds, 38 native
+tests, 13 Wasm tests, 17 CLI tests against the Wasm executable, and anonymous
 HTTPS smoke tests on both backends. Standards and spec review findings were
 fixed and covered by focused regressions. Other operating systems await CI.

@@ -14,10 +14,10 @@ import {
   "moonbitlang/async@0.22.1",
   "moonbitlang/x@0.5.5",
   "moonbit-community/charclass@0.1.4",
-  "bobzhang/liquid@0.1.1",
   "mizchi/bit_protocol@0.48.0",
   "mizchi/bit_repo@0.48.0",
   "mizchi/bit_object@0.48.0",
   "mizchi/bit_types@0.48.0",
   "mizchi/bit_lib@0.48.0",
+  "moonbit-community/liquid@0.2.0",
 }

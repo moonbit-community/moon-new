@@ -31,11 +31,14 @@ fn inventory() -> Array[Entry] {
 
 ///|
 /// Render the pinned template's file names and contents before creating files.
-pub fn render(username : String, name : String) -> Array[Entry] {
+pub fn render(
+  username : String,
+  name : String,
+) -> Array[Entry] raise TemplateError {
   let context = @liquid.LiquidContext::new()
   context.set("username", @liquid.string_value(username))
   context.set("module", @liquid.string_value(name))
-  inventory().map(fn(entry) {
+  inventory().map(entry => {
     match entry {
       File(path~, content~, executable~) => {
         let parent = path.split("/").to_array()
@@ -46,12 +49,32 @@ pub fn render(username : String, name : String) -> Array[Entry] {
         }
         context.set("package", @liquid.string_value(package_name))
         File(
-          path=@liquid.parse(path).render(context),
-          content=@liquid.parse(content).render(context),
+          path=render_text(path, context, source="file name: \{path}"),
+          content=render_text(content, context, source=path),
           executable~,
         )
       }
       Link(..) => entry
     }
   })
+}
+
+///|
+fn render_text(
+  text : String,
+  context : @liquid.LiquidContext,
+  source~ : String,
+) -> String raise TemplateError {
+  match @liquid.compile(text).bind(template => template.render(context)) {
+    Ok(output) => output
+    Err(diagnostics) => {
+      let messages = diagnostics.map(diagnostic => {
+        let location = diagnostic.offset
+          .map(offset => " at UTF-16 offset \{offset}")
+          .unwrap_or("")
+        "\{diagnostic.phase} [\{diagnostic.code}]\{location}: \{diagnostic.message}"
+      })
+      raise TemplateError("Could not render \{source}:\n" + messages.join("\n"))
+    }
+  }
 }

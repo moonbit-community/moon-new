@@ -49,7 +49,7 @@ retaining warnings and errors. Exit codes are 0 (success), 1 (creation failure),
 and 2 (argument errors).
 
 The bundled template is pinned to official Moon `e4f45e4`. It is embedded with
-`dev_build` and rendered with `bobzhang/liquid`; generation works offline and
+`dev_build` and rendered with `moonbit-community/liquid`; generation works offline and
 never executes `moon new`. See [the design](docs/phase-1.md) and
 [implementation notes](docs/phase-1-implementation.md).
 
