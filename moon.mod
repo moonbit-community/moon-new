@@ -8,7 +8,7 @@ license = "Apache-2.0"
 
 preferred_target = "wasm"
 
-description = "A MoonBit project generator with planned support for Git repository templates."
+description = "A MoonBit project generator with support for Git repository templates."
 
 import {
   "moonbitlang/async@0.22.1",

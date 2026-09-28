@@ -46,6 +46,7 @@ jobs:
           moon test --target native
           moon test --target wasm
           MOON_NEW_TEST_TARGET=wasm moon test tests/cli_test.mbt --target native
+          MOON_NEW_TEST_TARGET=wasm moon test tests/template_cli_test.mbt --target native
           moon info
           moon fmt
           git diff --exit-code

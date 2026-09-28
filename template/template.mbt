@@ -1,31 +1,59 @@
 ///|
 pub(all) enum Entry {
-  File(path~ : String, content~ : String, executable~ : Bool)
+  File(path~ : String, content~ : Bytes, executable~ : Bool)
   Link(path~ : String, target~ : String)
 }
 
 ///|
 fn inventory() -> Array[Entry] {
   [
-    File(path="moon.pkg", content=asset_00, executable=false),
-    File(path="cmd/main/moon.pkg", content=asset_01, executable=false),
-    File(path="cmd/main/main.mbt", content=asset_02, executable=false),
-    File(path="{{package}}.mbt", content=asset_03, executable=false),
-    File(path="moon.mod", content=asset_04, executable=false),
-    File(path=".githooks/README.md", content=asset_05, executable=false),
-    File(path=".githooks/pre-commit", content=asset_06, executable=true),
-    File(path="LICENSE", content=asset_07, executable=false),
-    File(path="{{package}}_wbtest.mbt", content=asset_08, executable=false),
-    Link(path="README.md", target="README.mbt.md"),
-    File(path="README.mbt.md", content=asset_10, executable=false),
-    File(path=".gitignore", content=asset_11, executable=false),
+    File(path="moon.pkg", content=@utf8.encode(asset_00), executable=false),
     File(
-      path=".github/workflows/copilot-setup-steps.yml",
-      content=asset_12,
+      path="cmd/main/moon.pkg",
+      content=@utf8.encode(asset_01),
       executable=false,
     ),
-    File(path="{{package}}_test.mbt", content=asset_13, executable=false),
-    File(path="AGENTS.md", content=asset_14, executable=false),
+    File(
+      path="cmd/main/main.mbt",
+      content=@utf8.encode(asset_02),
+      executable=false,
+    ),
+    File(
+      path="{{package}}.mbt",
+      content=@utf8.encode(asset_03),
+      executable=false,
+    ),
+    File(path="moon.mod", content=@utf8.encode(asset_04), executable=false),
+    File(
+      path=".githooks/README.md",
+      content=@utf8.encode(asset_05),
+      executable=false,
+    ),
+    File(
+      path=".githooks/pre-commit",
+      content=@utf8.encode(asset_06),
+      executable=true,
+    ),
+    File(path="LICENSE", content=@utf8.encode(asset_07), executable=false),
+    File(
+      path="{{package}}_wbtest.mbt",
+      content=@utf8.encode(asset_08),
+      executable=false,
+    ),
+    Link(path="README.md", target="README.mbt.md"),
+    File(path="README.mbt.md", content=@utf8.encode(asset_10), executable=false),
+    File(path=".gitignore", content=@utf8.encode(asset_11), executable=false),
+    File(
+      path=".github/workflows/copilot-setup-steps.yml",
+      content=@utf8.encode(asset_12),
+      executable=false,
+    ),
+    File(
+      path="{{package}}_test.mbt",
+      content=@utf8.encode(asset_13),
+      executable=false,
+    ),
+    File(path="AGENTS.md", content=@utf8.encode(asset_14), executable=false),
   ]
 }
 
@@ -50,7 +78,9 @@ pub fn render(
         context.set("package", @liquid.string_value(package_name))
         File(
           path=render_text(path, context, source="file name: \{path}"),
-          content=render_text(content, context, source=path),
+          content=@utf8.encode(
+            render_text(@utf8.decode_lossy(content), context, source=path),
+          ),
           executable~,
         )
       }

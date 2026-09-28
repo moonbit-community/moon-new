@@ -8,6 +8,8 @@ import {
 // Values
 pub fn render(String, String) -> Array[Entry] raise TemplateError
 
+pub fn render_repository(Array[@repository.Entry], String, String, warnings? : Array[String]) -> Array[Entry] raise
+
 pub fn select(Array[@repository.Entry], warnings? : Array[String]) -> Array[(@repository.Entry, Bool)] raise
 
 // Errors
@@ -20,7 +22,7 @@ pub impl Show for TemplateError
 
 // Types and methods
 pub(all) enum Entry {
-  File(path~ : String, content~ : String, executable~ : Bool)
+  File(path~ : String, content~ : Bytes, executable~ : Bool)
   Link(path~ : String, target~ : String)
 }
 

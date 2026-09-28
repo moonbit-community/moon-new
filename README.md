@@ -1,9 +1,7 @@
 # moon-new
 
-Create a default MoonBit project using the bundled official starter template.
+Create a MoonBit project from the bundled official starter or a Git repository.
 The CLI lives in the root package and supports native and Wasm execution.
-Git repository templates (`--template`) are being implemented in
-[phase two](docs/phase-2.md); the CLI option is not available yet.
 
 ## Usage
 
@@ -25,6 +23,9 @@ moon install --path . --bin ./local-bin
 
 ```text
 moon-new <PATH> [--user <USER>] [--name <NAME>] [-q | --quiet]
+moon-new <PATH> --template <SOURCE> [--subdir <PATH_IN_REPO>]
+         [--branch <BRANCH> | --tag <TAG> | --rev <COMMIT>]
+         [--user <USER>] [--name <NAME>] [-q | --quiet]
 moon-new -h | --help
 ```
 
@@ -53,6 +54,64 @@ The bundled template is pinned to official Moon `e4f45e4`. It is embedded with
 never executes `moon new`. See [the design](docs/phase-1.md) and
 [implementation notes](docs/phase-1-implementation.md).
 
+## Git templates
+
+```sh
+moon-new hello --template owner/repo --user yourname
+moon-new hello --template https://github.com/owner/repo.git --tag v1
+moon-new hello --template ./local-repo --subdir examples/starter --branch main
+```
+
+Sources may be local Git repositories (including bare repositories), public
+HTTPS Git URLs, or GitHub `owner/repo` shorthand. Local sources use committed
+contents and ignore dirty or untracked files. Selection defaults to local HEAD
+or the remote's advertised default branch. `--rev` requires a full commit hash;
+`--branch`, `--tag`, and `--rev` are mutually exclusive. These options and
+`--subdir` require `--template`.
+
+Liquid expands file paths, directory names, selected UTF-8 file contents, and
+symbolic-link targets. The only supplied variables are `username` and `module`
+(the short project name), so write `{{username}}/{{module}}` for the full module
+identity. Unknown variables, invalid Liquid, output path escapes and collisions
+fail generation. Paths must be relative, without empty, `.`, `..`, backslash,
+colon, NUL, or `.git` components; Windows also rejects reserved filenames.
+
+An optional `moon.new.json` at the selected template root accepts only string
+arrays named `include`, `exclude`, and `ignore`:
+
+```json
+{
+  "exclude": ["assets/**", "*.png"],
+  "ignore": [".github", "template-notes.md"]
+}
+```
+
+Without `include` or `exclude`, all ordinary file contents are rendered.
+`include` is a whitelist; an empty array renders no contents. With only
+`exclude`, matched contents are copied unchanged. When both are present,
+`include` wins and a warning is emitted. Patterns follow cargo-generate's
+Gitignore-style matching, including negation, character classes, escapes and
+`**`; they match source paths before interpolation. Literal braces must be
+escaped in patterns (for example `"\\{\\{module\\}\\}.txt"` in JSON).
+
+`ignore` contains literal relative paths, not patterns, and omits files or
+whole subtrees before rendering. Missing entries are harmless. The config
+itself and Git metadata are omitted. Parent configurations are not inherited.
+There is no special `.liquid` suffix handling. Binary files must be excluded
+from content rendering; copied bytes are preserved exactly, while paths still
+expand.
+
+Symlinks are preserved, including external and dangling targets. If the OS
+cannot create one, generation warns and attempts to copy its target as a file
+or directory using only this generation's rendered contents. Missing, external
+or cyclic fallback targets fail and trigger rollback. Executable file modes
+are preserved where supported.
+
+Authentication, SSH, submodules, Git LFS downloads, custom variables and hooks
+are unsupported. Required submodules or LFS pointers fail unless omitted with
+`ignore`. Production Git operations use bit libraries without spawning Git.
+See [the phase-two design](docs/phase-2.md).
+
 ## Development
 
 ```sh
@@ -63,6 +122,9 @@ moon build --target wasm
 moon test --target native
 moon test --target wasm
 MOON_NEW_TEST_TARGET=wasm moon test tests/cli_test.mbt --target native
+MOON_NEW_TEST_TARGET=wasm moon test tests/template_cli_test.mbt --target native
+MOON_NEW_TEST_REMOTE=1 moon test tests/template_cli_test.mbt --target native
+MOON_NEW_TEST_REMOTE=1 MOON_NEW_TEST_TARGET=wasm moon test tests/template_cli_test.mbt --target native
 MOON_NEW_TEST_REMOTE=1 moon test repository/repository_test.mbt --target native
 MOON_NEW_TEST_REMOTE=1 moon test repository/repository_test.mbt --target wasm
 moon info && moon fmt

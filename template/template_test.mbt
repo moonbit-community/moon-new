@@ -12,6 +12,6 @@ test "render the fixed default project without changing Unicode or newlines" {
       _ => ()
     }
   }
-  assert_eq(readme, Some("# 用户𐐀/hello"))
-  assert_eq(hook, Some(("#!/bin/sh\n\nmoon check", true)))
+  assert_eq(readme, Some(@utf8.encode("# 用户𐐀/hello")))
+  assert_eq(hook, Some((b"#!/bin/sh\n\nmoon check", true)))
 }

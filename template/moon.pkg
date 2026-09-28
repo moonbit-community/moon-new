@@ -3,6 +3,7 @@ import {
   "moonbit-community/moon-new/repository",
   "mizchi/bit_lib" @git,
   "moonbitlang/core/json",
+  "moonbitlang/x/path",
   "moonbitlang/core/encoding/utf8",
 }
 

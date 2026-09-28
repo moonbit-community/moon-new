@@ -1,8 +1,7 @@
 # Phase 2: Git repository templates
 
-Status: implementation authorized; repository access and file selection are
-implemented. Liquid is upgraded to `moonbit-community/liquid@0.2.0`;
-CLI template generation remains in progress.
+Status: implementation complete; local validation and review passed.
+Liquid uses the published `moonbit-community/liquid@0.2.0`.
 
 ## Confirmed direction
 
@@ -120,10 +119,13 @@ Its special `.liquid` handling and Cargo-specific metadata exclusions do not app
   It is not an injectable project-generation filesystem. Its timestamp method
   explicitly fails: the object/ref operations used here do not request mtimes.
 
-Pending: Git-template rendering of contents/paths/link
-targets, output-path validation and collisions, CLI options, binary output,
-directory-link fallback/rollback, and end-to-end template generation acceptance.
-The existing CLI still creates only the bundled default template.
+The CLI now connects repository selection, file rules, Liquid rendering and
+project creation. Rendered paths are validated before writes. Binary copies
+preserve bytes; symlinks preserve expanded targets, with file/directory copy
+fallback limited to the rendered inventory. Write and fallback failures roll
+back created files and directories, preserving pre-existing empty destinations.
+Case aliases that collide during link creation fail instead of copying through
+an existing path.
 
 Phase-one behavior is documented in [phase-1.md](phase-1.md), with Git command
 invocation superseded by the library initialization described above.
@@ -137,7 +139,7 @@ decision to wait for publication, it has been replaced with
 `Result` values with diagnostics. The bundled renderer now propagates these as
 `TemplateError`, including the source path, phase, code, message, and available
 UTF-16 offset. No unpublished source is vendored and error-like output text is
-not interpreted as a failure. Q11 still requires Git-template integration.
+not interpreted as a failure. Git templates use the same diagnostic handling.
 
 The current implementation uses `mizchi/bit_lib`, `bit_protocol`, `bit_repo`,
 `bit_object`, and `bit_types` version 0.48.0. Local and HTTPS
@@ -171,7 +173,11 @@ Pattern semantics were compared with cargo-generate's pinned `ignore` 0.4.33
 and `globset` 0.4.20 using a temporary Rust oracle (1,296 combinations), followed
 by focused regressions for review findings. Committed tests are all MoonBit.
 
-Validation on macOS: warning-free native/Wasm checks and builds, 38 native
-tests, 13 Wasm tests, 17 CLI tests against the Wasm executable, and anonymous
-HTTPS smoke tests on both backends. Standards and spec review findings were
-fixed and covered by focused regressions. Other operating systems await CI.
+Validation on macOS: warning-free native/Wasm checks and builds, 49 native
+tests, 13 Wasm tests, and 28 CLI tests against the Wasm executable. Anonymous
+HTTPS repository loading and full CLI generation passed on both backends;
+CLI remote tests ran with an empty PATH. Package archive/install acceptance
+and the independent bundled-template fixtures also passed. Standards and spec
+reviews confirmed fixes for case-aliased symlink ancestors and finite repeated
+link traversal, both covered by CLI regressions. Other operating systems await
+CI. Registry publication is separate from this implementation milestone.

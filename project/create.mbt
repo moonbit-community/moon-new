@@ -48,8 +48,10 @@ async fn ensure_directory(path : String, created : Array[CreatedPath]) -> Unit {
 ///|
 async fn write_new(
   path : String,
-  content : String,
+  content : Bytes,
   created : Array[CreatedPath],
+  executable~ : Bool,
+  warnings~ : Array[String],
 ) -> Unit {
   let file = @fs.open(
     path,
@@ -60,6 +62,11 @@ async fn write_new(
   created.push(File(path))
   defer file.close()
   file.write(content)
+  if executable && !(@async.platform is Windows) {
+    @fs.chmod(path, 0o755) catch {
+      err => warnings.push("Could not make \{path} executable: \{err}")
+    }
+  }
 }
 
 ///|
@@ -84,6 +91,11 @@ pub async fn create(
   destination : String,
   user? : String,
   name? : String,
+  template? : String,
+  subdir? : String,
+  branch? : String,
+  tag? : String,
+  rev? : String,
   warnings? : Array[String] = [],
 ) -> CreatedProject {
   let username = match user {
@@ -92,7 +104,30 @@ pub async fn create(
   }
   let name = name.unwrap_or_else(() => inferred_name(destination))
   validate_names(username, name, warnings)
-  let entries = @template.render(username, name)
+  let entries = match template {
+    Some(source) =>
+      @template.render_repository(
+        @repository.load(
+          source,
+          branch?,
+          tag?,
+          rev?,
+          subdir=subdir.unwrap_or(""),
+        ),
+        username,
+        name,
+        warnings~,
+      )
+    None => {
+      if subdir is Some(_) ||
+        branch is Some(_) ||
+        tag is Some(_) ||
+        rev is Some(_) {
+        raise CreationError("Repository options require --template")
+      }
+      @template.render(username, name)
+    }
+  }
   let destination = destination_path(destination)
   check_destination(destination)
   let created : Array[CreatedPath] = []
@@ -101,41 +136,58 @@ pub async fn create(
     // Missing ancestors can initially hide an existing target behind `..`.
     // Recheck its resolved eligibility before writing any template files.
     check_destination(destination)
+    let inventory : Map[String, @template.Entry] = Map([])
     for entry in entries {
-      match entry {
-        File(path~, content~, executable~) => {
-          let path = join_path(destination, path)
-          ensure_directory(@path.Path(path).dirname().to_string(), created)
-          write_new(path, content, created)
-          if executable && !(@async.platform is Windows) {
-            @fs.chmod(path, 0o755) catch {
-              err => warnings.push("Could not make \{path} executable: \{err}")
-            }
-          }
-        }
-        Link(path~, target~) => {
-          let path = join_path(destination, path)
-          try {
-            @fs.symlink(target~, path, force_symlink=true)
-            created.push(File(path))
-          } catch {
-            err => {
-              warnings.push(
-                "Could not create symbolic link \{path}; copying instead: \{err}",
+      let path = match entry {
+        File(path~, ..) | Link(path~, ..) => path
+      }
+      inventory[path] = entry
+      // Create every parent before any links, so filesystem aliases cannot
+      // redirect a later output through a previously generated symlink.
+      ensure_directory(
+        @path.Path(join_path(destination, path)).dirname().to_string(),
+        created,
+      )
+    }
+    // Write regular files first. Link fallbacks use the inventory even when the
+    // referenced link or directory has not been materialized yet.
+    for entry in entries {
+      if entry is File(path~, content~, executable~) {
+        let path = join_path(destination, path)
+        write_new(path, content, created, executable~, warnings~)
+      }
+    }
+    for entry in entries {
+      if entry is Link(path=relative, target~) {
+        let path = join_path(destination, relative)
+        try {
+          @fs.symlink(target~, path, force_symlink=true)
+          created.push(File(path))
+        } catch {
+          err => {
+            // A case-folded alias may already exist on this filesystem.
+            // Never treat a collision as permission to copy through that path.
+            if existing_kind(path) is Some(_) {
+              raise CreationError(
+                "Output path collision at \{relative}: \{err}",
               )
-              let mut content = None
-              for entry in entries {
-                if entry is File(path=file_path, content=text, ..) &&
-                  file_path == target {
-                  content = Some(text)
-                  break
-                }
-              }
-              guard content is Some(text) else {
-                raise CreationError("Missing bundled link target: \{target}")
-              }
-              write_new(path, text, created)
             }
+            warnings.push(
+              "Could not create symbolic link \{path}; copying instead: \{err}",
+            )
+            if target.has_prefix("/") ||
+              target.contains("\\") ||
+              target.contains(":") ||
+              target == "" {
+              raise CreationError(
+                "Invalid or external symbolic-link copy target: \{relative}",
+              )
+            }
+            let parent = relative.split("/").to_array()
+            ignore(parent.pop())
+            let prefix = parent.map(part => part.to_owned()).join("/")
+            let source = (if prefix == "" { "" } else { prefix + "/" }) + target
+            copy_target(source, path, inventory, created, warnings, [])
           }
         }
       }
