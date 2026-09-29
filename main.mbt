@@ -57,21 +57,27 @@ async fn main {
   }
   let quiet = matches.flags.get("quiet").unwrap_or(false)
   let warnings : Array[String] = []
-  let result = @project.create(
-    destination,
-    user?,
-    name?,
-    template?,
-    subdir?,
-    branch?,
-    tag?,
-    rev?,
-    warnings~,
+  let result = Ok(
+    @project.create(
+      destination,
+      user?,
+      name?,
+      template?,
+      subdir?,
+      branch?,
+      tag?,
+      rev?,
+      warnings~,
+    ),
   ) catch {
-    error => {
-      for warning in warnings {
-        @stdio.stderr.write("Warning: \{warning}\n")
-      }
+    error => Err(error)
+  }
+  for warning in warnings {
+    @stdio.stderr.write("Warning: \{warning}\n")
+  }
+  let result = match result {
+    Ok(project) => project
+    Err(error) => {
       match error {
         @os_error.OSError(_) =>
           @stdio.stderr.write(
@@ -83,12 +89,12 @@ async fn main {
       return
     }
   }
-  for warning in result.warnings {
-    @stdio.stderr.write("Warning: \{warning}\n")
-  }
   if !quiet {
-    @stdio.stdout.write(result.git_stdout)
-    @stdio.stderr.write(result.git_stderr)
+    if result.git_initialized {
+      @stdio.stdout.write(
+        "Initialized empty Git repository in \{destination}/.git/\n",
+      )
+    }
     @stdio.stdout.write(
       "Created \{result.username}/\{result.name} at \{destination}\n",
     )

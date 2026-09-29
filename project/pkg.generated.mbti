@@ -16,9 +16,7 @@ pub impl Show for CreationError
 pub struct CreatedProject {
   username : String
   name : String
-  warnings : Array[String]
-  git_stdout : String
-  git_stderr : String
+  git_initialized : Bool
 }
 
 // Type aliases

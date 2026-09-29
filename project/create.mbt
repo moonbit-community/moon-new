@@ -2,9 +2,7 @@
 pub struct CreatedProject {
   username : String
   name : String
-  warnings : Array[String]
-  git_stdout : String
-  git_stderr : String
+  git_initialized : Bool
 }
 
 ///|
@@ -86,7 +84,7 @@ async fn check_destination(destination : String) -> Unit {
 
 ///|
 /// Create only in an absent or empty directory.
-/// Supply a warnings array to retain diagnostics even when creation fails.
+/// Supply a warnings array to collect diagnostics on both success and failure.
 pub async fn create(
   destination : String,
   user? : String,
@@ -218,8 +216,8 @@ pub async fn create(
       raise CreationError("Could not create \{destination}: \{error}\{cleanup}")
     }
   }
-  let (git_stdout, git_stderr) = initialize_git(destination, warnings)
-  { username, name, warnings, git_stdout, git_stderr, }
+  let git_initialized = initialize_git(destination, warnings)
+  { username, name, git_initialized, }
 }
 
 ///|
