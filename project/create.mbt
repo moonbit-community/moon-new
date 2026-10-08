@@ -131,22 +131,12 @@ pub async fn create(
   }
   let destination = destination_path(destination)
   check_destination(destination)
-  let created : Array[CreatedPath] = []
-  let residual : Array[String] = []
-  try {
+  {
+    let created : Array[CreatedPath] = []
     errdefer (for entry in created.rev_iter() {
-      try {
-        match entry {
-          File(path) => @fs.remove(path)
-          Directory(path) => @fs.rmdir(path)
-        }
-      } catch {
-        cleanup_error => {
-          let path = match entry {
-            File(path) | Directory(path) => path
-          }
-          residual.push("\{path}: \{cleanup_error}")
-        }
+      match entry {
+        File(path) => @fs.remove(path)
+        Directory(path) => @fs.rmdir(path)
       }
     })
     ensure_directory(destination, created)
@@ -178,15 +168,6 @@ pub async fn create(
       if entry is Link(path=relative, target~) {
         create_link(destination, relative, target, inventory, created, warnings)
       }
-    }
-  } catch {
-    error => {
-      if residual.is_empty() {
-        raise error
-      }
-      let cleanup = "\nCleanup failed; paths may remain:\n" +
-        residual.join("\n")
-      raise CreationError("Could not create \{destination}: \{error}\{cleanup}")
     }
   }
   let git_initialized = initialize_git(destination, warnings)
