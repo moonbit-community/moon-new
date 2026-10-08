@@ -11,7 +11,7 @@ preferred_target = "wasm"
 description = "A MoonBit project generator with support for Git repository templates."
 
 import {
-  "moonbitlang/async@0.22.1",
+  "moonbitlang/async@0.22.4",
   "moonbitlang/x@0.5.5",
   "moonbit-community/charclass@0.1.4",
   "mizchi/bit_protocol@0.48.0",
