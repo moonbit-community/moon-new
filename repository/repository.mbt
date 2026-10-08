@@ -16,11 +16,15 @@ pub async fn load(
   rev? : String,
   subdir? : String = "",
 ) -> Array[Entry] {
-  let selectors = [branch, tag, rev].filter(value => value is Some(_))
-  guard selectors.length() <= 1 else {
-    raise @object.GitError::InvalidObject(
-      "--branch, --tag and --rev are mutually exclusive",
-    )
+  let requested = match (branch, tag, rev) {
+    (None, None, None) => "HEAD"
+    (Some(name), None, None)
+    | (None, Some(name), None)
+    | (None, None, Some(name)) => name
+    _ =>
+      raise @object.GitError::InvalidObject(
+        "--branch, --tag and --rev are mutually exclusive",
+      )
   }
   let components = if subdir == "" || subdir == "." {
     []
@@ -63,7 +67,7 @@ pub async fn load(
     }
     let id = selected.unwrap_or_else(() => {
       raise @object.GitError::InvalidObject(
-        "Remote Git revision not found: \{selectors.get(0).bind(x => x).unwrap_or("HEAD")}",
+        "Remote Git revision not found: \{requested}",
       )
     })
     let store = @repo.ObjectStore::from_pack(
@@ -90,15 +94,14 @@ pub async fn load(
     Some((directory, _)) => directory
     None => raise @object.GitError::IoError("Not a Git repository: \{source}")
   }
-  let selected = match (branch, tag, rev) {
-    (Some(_), _, _) | (_, Some(_), _) =>
-      @git.resolve_ref(disk, git_dir, refname.unwrap())
-    (_, _, Some(_)) => revision
-    _ => @git.resolve_head_commit(disk, git_dir)
+  let selected = match (refname, revision) {
+    (Some(name), _) => @git.resolve_ref(disk, git_dir, name)
+    (None, Some(id)) => Some(id)
+    (None, None) => @git.resolve_head_commit(disk, git_dir)
   }
   let id = selected.unwrap_or_else(() => {
     raise @object.GitError::InvalidObject(
-      "Git revision not found in \{source}: \{selectors.get(0).bind(x => x).unwrap_or("HEAD")}",
+      "Git revision not found in \{source}: \{requested}",
     )
   })
   let db = @git.ObjectDb::load_lazy(disk, git_dir)
