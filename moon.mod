@@ -2,7 +2,7 @@ name = "moonbit-community/moon-new"
 
 version = "0.1.0"
 
-readme = "README.md"
+readme = "README.mbt.md"
 
 license = "Apache-2.0"
 

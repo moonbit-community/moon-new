@@ -4,5 +4,4 @@ target/
 .moonagent/
 .DS_Store
 tests/
-docs/
 !template/assets/**
