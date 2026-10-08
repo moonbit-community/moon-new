@@ -1,15 +1,19 @@
 # Validation
 
-Last code validation: **2026-09-24, macOS ARM64**. Moon `0.1.20260920 (914d7da)`;
+Last code validation: **2026-10-08, macOS ARM64**. Moon `0.1.20260920 (914d7da)`;
 moonc `v0.10.14+7d59c7ec9 (2026-09-18)`.
-Dependencies: async 0.22.1, x 0.5.5, charclass 0.1.4 (ucd 0.5.0), Liquid 0.1.1.
+Dependencies: async 0.22.1, x 0.5.5, charclass 0.1.4 (ucd 0.5.0),
+`moonbit-community/liquid` 0.2.0, bit libraries 0.48.0.
+The refreshed Mooncakes index still lists Liquid 0.2.0 as the latest release;
+the project already uses this version.
 
 | Check | Recorded result |
 | --- | --- |
 | Native/Wasm check with `--deny-warn` | Passed |
-| Native tests, including CLI and package acceptance | 24 reported passed |
-| Wasm tests | 6 reported passed |
-| CLI acceptance per backend, using a native harness | 17 reported passed each |
+| Native/Wasm build | Passed |
+| Native tests, including CLI and package acceptance | 49 reported passed |
+| Wasm tests | 13 reported passed |
+| CLI acceptance per backend, using a native harness | 17 default + 11 Git-template tests reported passed each |
 | Archive assets, regeneration, local installation | Passed |
 | Generated project check/test/run | Passed; zero starter tests; output `Hello` |
 | `moon info`, `moon fmt`, whitespace checks | Passed |
@@ -28,15 +32,17 @@ Reproduction commands are in [README](../README.md#development).
   existing empty-directory preservation, and `missing/../existing` rejection.
   Successful rollback preserves the original `OSError` type.
 - CLI tests cover names, credentials, destination rules, symlinks, Unix umask,
-  Git reuse/failure, quiet mode, full stable diagnostic text, warning-before-error
-  order, and token secrecy. Missing Git uses an empty child PATH; initialization
-  failure uses Git's invalid default-branch configuration. OS reason text varies.
+  Git reuse, quiet mode, full stable diagnostic text, warning-before-error order,
+  and token secrecy. An empty child PATH verifies independence from the Git
+  executable; invalid Git default-branch configuration does not affect library
+  initialization. OS reason text varies.
 - The package test verifies all 14 assets/constants, extracts the archive,
   removes generated constants, installs locally, and checks regeneration,
   installed command naming, and a generated project. This is not publication.
-- Removing the filesystem adapter also removed injected partial-write,
-  symlink/copy, chmod, cleanup-failure, and file-race tests. Those forced failure
-  paths are no longer exercised. README fallback and rollback remain implemented.
+- Removing the filesystem adapter removed injected failure tests. Real filesystem
+  tests now exercise symlink copy fallback, unsafe fallback targets, case-alias
+  escapes, and write-failure rollback. Partial-write, chmod, cleanup-failure, and
+  concurrent file-race failures are not explicitly injected.
 - Standards/Spec reviews found no remaining actionable issues after correcting
   `..` destination checks and Windows drive-relative joins. Diagnostic cleanup
   was reviewed against `cd0c61a`. No general Liquid conformance is claimed.

@@ -3,6 +3,10 @@ fn credentials_path() -> String? {
   if @env.get_env_var("MOON_HOME") is Some(root) {
     return Some(join_path(root, "credentials.json"))
   }
+  // Unlike Rust's home::home_dir(), this only checks environment variables:
+  // the current MoonBit APIs provide no OS home-directory fallback shared by
+  // native and Wasm. If unavailable, the caller warns and uses the default
+  // username; users can set MOON_HOME or bypass lookup with --user.
   let root = if @async.platform is Windows {
     @env.get_env_var("USERPROFILE").filter(value => value != "")
   } else {
