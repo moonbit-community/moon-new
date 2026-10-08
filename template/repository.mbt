@@ -46,7 +46,7 @@ pub fn render_repository(
 ///|
 /// Reject aliases, escapes and file/directory conflicts before writing anything.
 fn validate_paths(entries : Array[Entry]) -> Unit raise TemplateError {
-  let paths : Map[String, String] = Map([])
+  let paths : Set[String] = Set([])
   let directories : Map[String, String] = Map([])
   for entry in entries {
     let path = match entry {
@@ -87,8 +87,8 @@ fn validate_paths(entries : Array[Entry]) -> Unit raise TemplateError {
         }
       }
     }
-    if paths.get(path) is Some(previous) {
-      raise TemplateError("Output path collision: \{previous} and \{path}")
+    if paths.contains(path) {
+      raise TemplateError("Output path collision: \{path} and \{path}")
     }
     if directories.get(path) is Some(child) {
       raise TemplateError(
@@ -102,13 +102,13 @@ fn validate_paths(entries : Array[Entry]) -> Unit raise TemplateError {
       } else {
         parent + "/" + components[i]
       }
-      if paths.get(parent) is Some(previous) {
+      if paths.contains(parent) {
         raise TemplateError(
-          "Output path collision: \{previous} is also a directory for \{path}",
+          "Output path collision: \{parent} is also a directory for \{path}",
         )
       }
       directories[parent] = path
     }
-    paths[path] = path
+    paths.add(path)
   }
 }
