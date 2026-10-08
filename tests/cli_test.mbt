@@ -1,7 +1,7 @@
 ///|
 async test "CLI matches the independent official fixture" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   let fixture = @json.parse(
     @fs.read_file(root() + "/tests/fixtures/official.json").text(),
   )
@@ -51,7 +51,7 @@ async test "CLI matches the independent official fixture" {
 ///|
 async test "CLI credentials and explicit user" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   @fs.mkdir(s.env["MOON_HOME"])
   let credentials = s.env["MOON_HOME"] + "/credentials.json"
   @fs.write_file(
@@ -78,7 +78,7 @@ async test "CLI credentials and explicit user" {
 ///|
 async test "CLI destinations and quiet output" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   @fs.mkdir(s.root + "/empty")
   let result = s.run(["empty", "--user", "tester", "-q"])
   assert_eq(result.status, 0, msg=result.stderr)
@@ -101,7 +101,7 @@ async test "CLI destinations and quiet output" {
 ///|
 async test "CLI names and argument forms" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   let result = s.run(["foo.bar", "--user=用户𐐀", "--quiet"])
   assert_eq(result.status, 0, msg=result.stderr)
   assert_eq(s.read("foo.bar/README.mbt.md"), "# 用户𐐀/foo")
@@ -141,7 +141,7 @@ async test "CLI names and argument forms" {
 ///|
 async test "CLI strict credential schema" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   @fs.mkdir(s.env["MOON_HOME"])
   let credentials = s.env["MOON_HOME"] + "/credentials.json"
   for
@@ -181,7 +181,7 @@ async test "CLI strict credential schema" {
 ///|
 async test "CLI home lookup and unavailable Git" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   for key in ["MOON_HOME", "HOME", "USERPROFILE"] {
     s.env.remove(key)
   }
@@ -201,7 +201,7 @@ async test "CLI home lookup and unavailable Git" {
 ///|
 async test "CLI reuses the parent Git repository" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", s.root], cwd=s.root))
   let result = s.run(["child", "--user", "tester", "-q"])
   assert_eq(result.status, 0, msg=result.stderr)
@@ -213,7 +213,7 @@ async test "CLI reuses the parent Git repository" {
 ///|
 async test "CLI rejects destination symlinks and follows parent symlinks" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   @fs.mkdir(s.root + "/real")
   if !directory_link(s.root + "/real", s.root + "/link") {
     return
@@ -241,7 +241,7 @@ async test "CLI permissions respect the Unix umask" {
     return
   }
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   let (program, prefix) = cli_command()
   let result = command(
     "sh",
@@ -260,7 +260,7 @@ async test "CLI permissions respect the Unix umask" {
 ///|
 async test "CLI library initialization is independent of Git command configuration" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   s.env["GIT_CONFIG_COUNT"] = "1"
   s.env["GIT_CONFIG_KEY_0"] = "init.defaultBranch"
   s.env["GIT_CONFIG_VALUE_0"] = "invalid branch name"
@@ -275,7 +275,7 @@ async test "CLI library initialization is independent of Git command configurati
 ///|
 async test "CLI dotdot cannot bypass destination checks" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   @fs.mkdir(s.root + "/existing")
   @fs.write_file(s.root + "/existing/unrelated.txt", "keep me")
   let result = s.run(["missing/../existing", "--user", "tester", "-q"])
@@ -302,7 +302,7 @@ async test "CLI Windows drive-relative names" {
     return
   }
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   let result = s.run([
     s.root[:2].to_owned() + "drive_relative",
     "--user",
@@ -316,7 +316,7 @@ async test "CLI Windows drive-relative names" {
 ///|
 async test "CLI help and argument errors" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   let result = s.run(["--help"])
   assert_eq(result.status, 0, msg=result.stderr)
   assert_true(result.stdout.contains("--user"))
@@ -333,7 +333,7 @@ async test "CLI help and argument errors" {
 ///|
 async test "CLI retains warnings before a validation error in either quiet mode" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   for quiet in [[], ["--quiet"]] {
     let result = s.run(["invalid", "--name", "0bad"] + quiet)
     assert_eq(result.status, 1)
@@ -349,7 +349,7 @@ async test "CLI retains warnings before a validation error in either quiet mode"
 ///|
 async test "CLI keeps all warnings in order when the destination is rejected" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   @fs.mkdir(s.root + "/occupied")
   @fs.write_file(s.root + "/occupied/keep", "original")
   let result = s.run(["occupied", "--name", "sample_test", "-q"])
@@ -366,7 +366,7 @@ async test "CLI keeps all warnings in order when the destination is rejected" {
 ///|
 async test "CLI credential diagnostics explain recovery without exposing credentials" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   @fs.mkdir(s.env["MOON_HOME"])
   let credentials = s.env["MOON_HOME"] + "/credentials.json"
   for
@@ -398,7 +398,7 @@ async test "CLI credential diagnostics explain recovery without exposing credent
 ///|
 async test "CLI filesystem errors retain warnings, project context, and their cause" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   let name = "a".repeat(1024)
   for quiet in [[], ["-q"]] {
     let result = s.run(["broken", "--name", name] + quiet)

@@ -1,7 +1,7 @@
 ///|
 async test "repository reads committed bytes and modes without a checkout" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   @fs.write_file(source + "/file.txt", "committed")
@@ -37,7 +37,7 @@ async test "repository reads committed bytes and modes without a checkout" {
 ///|
 async test "repository supports bare repositories and linked worktrees" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   @fs.write_file(source + "/file", "committed")
@@ -70,7 +70,7 @@ async test "repository supports bare repositories and linked worktrees" {
 ///|
 async test "repository initialization reports filesystem failure without removing project files" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   @fs.write_file(s.root + "/.git", "occupied")
   @fs.write_file(s.root + "/project-file", "keep")
   try @repository.initialize(s.root) catch {
@@ -86,7 +86,7 @@ async test "repository initialization reports filesystem failure without removin
 ///|
 async test "template matching uses source paths, nearest matches and root-local configuration" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   @fs.write_file(source + "/moon.new.json", "{\"include\":[]}")
@@ -178,7 +178,7 @@ async test "template matching uses source paths, nearest matches and root-local 
 ///|
 async test "template validation rejects malformed config, binary rendering, submodules and LFS" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   @fs.write_file(source + "/file", "fixture")
@@ -255,7 +255,7 @@ async test "template validation rejects malformed config, binary rendering, subm
 ///|
 async test "template rules distinguish byte copies, literal omissions and content rendering" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   @fs.mkdir(source + "/src")
@@ -310,7 +310,7 @@ async test "template rules distinguish byte copies, literal omissions and conten
 ///|
 async test "repository selects packed refs, annotated tags, commits and subdirectories" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   @fs.mkdir(source + "/nested")

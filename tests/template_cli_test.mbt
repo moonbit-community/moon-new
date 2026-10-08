@@ -16,7 +16,7 @@ async fn commit_template(source : String) -> Unit {
 ///|
 async test "CLI generates a committed template with rendered paths and byte copies without Git on PATH" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   @fs.mkdir(source + "/{{module}}")
@@ -65,7 +65,7 @@ async test "CLI generates a committed template with rendered paths and byte copi
 ///|
 async test "template failures report source paths and leave destinations untouched" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   let cases : Array[(String, Array[(String, String)], String)] = [
@@ -116,7 +116,7 @@ async test "template failures report source paths and leave destinations untouch
 ///|
 async test "CLI rejects incompatible repository options before generation" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   for
     options in [
       ["--branch", "main"],
@@ -157,7 +157,7 @@ async fn add_template_link(
 ///|
 async test "CLI preserves expanded relative, dangling and external symbolic links" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   @fs.mkdir(source + "/dir")
@@ -212,7 +212,7 @@ async test "CLI preserves expanded relative, dangling and external symbolic link
 ///|
 async test "failed symlinks copy generated files and directories and reject unsafe fallback targets" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   // Exceed OS link-target limits without changing the referenced project path.
@@ -276,7 +276,7 @@ async test "case aliases cannot turn symlink fallback into writes outside the de
     return
   }
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   @fs.mkdir(source + "/dir")
@@ -308,7 +308,7 @@ async test "case aliases cannot turn symlink fallback into writes outside the de
 ///|
 async test "CLI forwards branch tag revision and subdirectory and keeps configuration root local" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   @fs.write_file(source + "/moon.new.json", "{\"include\":[]}")
@@ -341,7 +341,7 @@ async test "CLI forwards branch tag revision and subdirectory and keeps configur
 ///|
 async test "Git template write failures roll back files and preserve existing empty destinations" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   @fs.write_file(source + "/a-first", "created before failure")
@@ -370,7 +370,7 @@ async test "Git template write failures roll back files and preserve existing em
 ///|
 async test "quiet Git generation keeps config warnings and ignores source files before rendering" {
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   @fs.write_file(
@@ -396,7 +396,7 @@ async test "CLI anonymous HTTPS generation needs no Git executable" {
     return
   }
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   s.env["PATH"] = ""
   let result = s.run([
     "out", "--template", "octocat/Hello-World", "--branch", "master", "--user", "alice",
@@ -414,7 +414,7 @@ async test "case aliases in link ancestors cannot write outside the project" {
     return
   }
   let s = Sandbox::new()
-  defer @fs.rmdir(s.root, recursive=true)
+  defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
   let source = s.root + "/source"
   @fs.write_file(source + "/file", "payload")

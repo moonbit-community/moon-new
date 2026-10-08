@@ -27,6 +27,49 @@ async fn Sandbox::new() -> Sandbox {
 }
 
 ///|
+async fn Sandbox::cleanup(self : Sandbox) -> Unit {
+  if windows() {
+    // Git objects are read-only on Windows. async/fs cannot clear that
+    // attribute, so use the system's forced directory removal for fixtures.
+    let (status, stdout, stderr) = @process.collect_output(
+      "powershell.exe",
+      [
+        "-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference = 'Stop'; Remove-Item -LiteralPath $env:MOON_NEW_TEST_CLEANUP -Recurse -Force",
+      ],
+      cwd=root(),
+      extra_env={ "MOON_NEW_TEST_CLEANUP": self.root },
+    )
+    assert_eq(status, 0, msg=stderr.text() + stdout.text())
+  } else {
+    @fs.rmdir(self.root, recursive=true)
+  }
+}
+
+///|
+async test "sandbox cleanup removes read-only files without following directory links" {
+  let s = Sandbox::new()
+  let outside = @fs.tmpdir(prefix="moon-new-cleanup-")
+  defer @fs.rmdir(outside, recursive=true)
+  let file = s.root + "/read-only.txt"
+  @fs.write_file(file, "fixture")
+  if windows() {
+    ignore(checked("attrib.exe", ["+R", file], cwd=root()))
+    try @fs.rmdir(s.root, recursive=true) catch {
+      _ => ()
+    } noraise {
+      _ => fail("expected read-only file deletion to fail on Windows")
+    }
+  } else {
+    @fs.chmod(file, 0o444)
+  }
+  @fs.write_file(outside + "/keep.txt", "outside")
+  ignore(directory_link(outside, s.root + "/link"))
+  s.cleanup()
+  assert_false(@fs.exists(s.root))
+  assert_eq(@fs.read_file(outside + "/keep.txt").text(), "outside")
+}
+
+///|
 struct Output {
   status : Int
   stdout : String
