@@ -132,7 +132,23 @@ pub async fn create(
   let destination = destination_path(destination)
   check_destination(destination)
   let created : Array[CreatedPath] = []
+  let residual : Array[String] = []
   try {
+    errdefer (for entry in created.rev_iter() {
+      try {
+        match entry {
+          File(path) => @fs.remove(path)
+          Directory(path) => @fs.rmdir(path)
+        }
+      } catch {
+        cleanup_error => {
+          let path = match entry {
+            File(path) | Directory(path) => path
+          }
+          residual.push("\{path}: \{cleanup_error}")
+        }
+      }
+    })
     ensure_directory(destination, created)
     // Missing ancestors can initially hide an existing target behind `..`.
     // Recheck its resolved eligibility before writing any template files.
@@ -165,22 +181,6 @@ pub async fn create(
     }
   } catch {
     error => {
-      let residual : Array[String] = []
-      for entry in created.rev_iter() {
-        try {
-          match entry {
-            File(path) => @fs.remove(path)
-            Directory(path) => @fs.rmdir(path)
-          }
-        } catch {
-          cleanup_error => {
-            let path = match entry {
-              File(path) | Directory(path) => path
-            }
-            residual.push("\{path}: \{cleanup_error}")
-          }
-        }
-      }
       if residual.is_empty() {
         raise error
       }
