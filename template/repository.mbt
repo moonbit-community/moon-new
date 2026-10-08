@@ -71,12 +71,14 @@ fn validate_paths(entries : Array[Entry]) -> Unit raise TemplateError {
     }
     if @path.sep == '\\' {
       for component in components {
-        let stem = component.split(".").to_array()[0].to_owned().to_upper()
+        let stem = component.split(".").next().unwrap().to_owned().to_upper()
         if component.has_suffix(".") ||
           component.has_suffix(" ") ||
           component
           .iter()
-          .any(ch => ch.to_int() < 32 || "<>\"|?*".contains(ch.to_string())) ||
+          .any(ch => {
+            ch.to_int() < 32 || ch is ('<' | '>' | '"' | '|' | '?' | '*')
+          }) ||
           [
             "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6",
             "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6",

@@ -1,11 +1,15 @@
 ///|
 async test "package assets regenerate, install, and create a runnable project" {
   let repository = root()
-  ignore(checked("moon", ["package"], cwd=repository))
-  let archive = repository +
-    "/_build/publish/moonbit-community-moon-new-0.1.0.zip"
   let temporary = @fs.tmpdir(prefix="moon-new-package-")
   defer @fs.rmdir(temporary, recursive=true)
+  let build = temporary + "/build"
+  ignore(checked("moon", ["package", "--target-dir", build], cwd=repository))
+  let archives = @fs.readdir(build + "/publish").filter(name => {
+    name.has_suffix(".zip")
+  })
+  guard archives is [name] else { fail("expected exactly one package archive") }
+  let archive = build + "/publish/" + name
   let source = temporary + "/source"
   @fs.mkdir(source)
   // Use the host archive utility; no extra MoonBit dependency is needed.
@@ -14,28 +18,25 @@ async test "package assets regenerate, install, and create a runnable project" {
   } else {
     ignore(checked("unzip", ["-q", archive, "-d", source], cwd=repository))
   }
-  let inputs = []
-  let manifest = @fs.read_file(repository + "/template/moon.pkg").text()
-  for line in manifest.split("\n") {
-    if line.trim().strip_prefix("input: \"") is Some(value) {
-      guard value.strip_suffix("\",") is Some(value) else {
-        fail("unexpected dev_build input")
-      }
-      inputs.push("template/" + value.to_owned())
-    }
-  }
-  assert_eq(inputs.length(), 14)
+  // The bundled starter's source assets must survive packaging independently
+  // of how dev_build rules are written in moon.pkg.
+  let inputs = [
+    "moon.pkg", "moon.mod", "cmd/main/moon.pkg", "cmd/main/main.mbt", "{{package}}.mbt",
+    "{{package}}_test.mbt", "{{package}}_wbtest.mbt", ".githooks/README.md", ".githooks/pre-commit",
+    "LICENSE", "README.mbt.md", ".gitignore", ".github/workflows/copilot-setup-steps.yml",
+    "AGENTS.md",
+  ]
   for path in inputs {
     assert_eq(
-      @fs.read_file(source + "/" + path).binary(),
-      @fs.read_file(repository + "/" + path).binary(),
+      @fs.read_file(source + "/template/assets/" + path).binary(),
+      @fs.read_file(repository + "/template/assets/" + path).binary(),
       msg=path,
     )
   }
   let generated = @fs.readdir(repository + "/template").filter(name => {
     name.has_suffix(".generated.mbt")
   })
-  assert_eq(generated.length(), 14)
+  assert_eq(generated.length(), inputs.length())
   for name in generated {
     let relative = "/template/" + name
     assert_eq(

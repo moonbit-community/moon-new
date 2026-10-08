@@ -139,7 +139,11 @@ async fn copy_target(
       let children : Set[String] = Set([])
       for path in entries.keys() {
         if path.has_prefix(prefix) {
-          let child = path[prefix.length():].split("/").to_array()[0].to_owned()
+          let child = path[prefix.length():]
+            .split("/")
+            .next()
+            .unwrap()
+            .to_owned()
           children.add(child)
         }
       }
