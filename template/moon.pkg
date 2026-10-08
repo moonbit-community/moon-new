@@ -162,5 +162,5 @@ dev_build(
 )
 
 options(
-  supported_targets: "wasm + native",
+  supported_targets: "wasm",
 )

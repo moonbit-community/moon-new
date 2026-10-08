@@ -2,19 +2,14 @@
 
 Create a MoonBit project from the bundled hello starter or a Git repository.
 
+Currently, only the Wasm target is supported.
+
 ## Usage
 
 Run directly with `moonx`:
 
 ```sh
 moonx moonbit-community/moon-new hello --user yourname
-```
-
-Or install the command:
-
-```sh
-moon install moonbit-community/moon-new
-moon-new hello --user yourname
 ```
 
 ```text

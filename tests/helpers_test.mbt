@@ -63,25 +63,19 @@ async fn checked(
 
 ///|
 async fn cli_command() -> (String, Array[String]) {
-  let target = @env.get_env_var("MOON_NEW_TEST_TARGET").unwrap_or("native")
-  if target == "native" {
-    (@fs.realpath(root() + "/_build/native/debug/build/moon-new.exe"), [])
-  } else {
-    assert_eq(target, "wasm")
-    // Resolve the runner before tests clear the child PATH to hide Git.
-    let executable = if windows() { "moonrun.exe" } else { "moonrun" }
-    let separator = if windows() { ";" } else { ":" }
-    for directory in @env.get_env_var("PATH").unwrap_or("").split(separator) {
-      let path = directory.to_owned() + "/" + executable
-      if @fs.exists(path) {
-        return (
-          @fs.realpath(path),
-          [root() + "/_build/wasm/debug/build/moon-new.wasm", "--"],
-        )
-      }
+  // Resolve the runner before tests clear the child PATH to hide Git.
+  let executable = if windows() { "moonrun.exe" } else { "moonrun" }
+  let separator = if windows() { ";" } else { ":" }
+  for directory in @env.get_env_var("PATH").unwrap_or("").split(separator) {
+    let path = directory.to_owned() + "/" + executable
+    if @fs.exists(path) {
+      return (
+        @fs.realpath(path),
+        [root() + "/_build/wasm/debug/build/moon-new.wasm", "--"],
+      )
     }
-    fail("moonrun not found on PATH")
   }
+  fail("moonrun not found on PATH")
 }
 
 ///|

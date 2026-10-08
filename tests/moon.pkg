@@ -11,5 +11,5 @@ import {
 } for "test"
 
 options(
-  supported_targets: "native",
+  supported_targets: "wasm",
 )

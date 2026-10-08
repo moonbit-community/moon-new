@@ -1,5 +1,5 @@
 ///|
-async test "package assets regenerate, install, and create a runnable project" {
+async test "package assets regenerate, build, and create a runnable project" {
   let repository = root()
   let temporary = @fs.tmpdir(prefix="moon-new-package-")
   defer @fs.rmdir(temporary, recursive=true)
@@ -48,14 +48,7 @@ async test "package assets regenerate, install, and create a runnable project" {
   }
   assert_false(@fs.exists(source + "/tests"))
   assert_false(@fs.exists(source + "/_build"))
-  let binary_dir = temporary + "/bin"
-  ignore(
-    checked(
-      "moon",
-      ["install", "--path", source, "--bin", binary_dir],
-      cwd=repository,
-    ),
-  )
+  ignore(checked("moon", ["build", "--target", "wasm"], cwd=source))
   for name in generated {
     let relative = "/template/" + name
     assert_eq(
@@ -64,14 +57,13 @@ async test "package assets regenerate, install, and create a runnable project" {
       msg=name,
     )
   }
-  let installed = binary_dir +
-    (if windows() { "/moon-new.exe" } else { "/moon-new" })
-  assert_true(@fs.exists(installed))
+  let artifact = source + "/_build/wasm/debug/build/moon-new.wasm"
+  assert_true(@fs.exists(artifact))
   let destination = temporary + "/generated"
   ignore(
     checked(
-      installed,
-      [destination, "--user", "tester", "--quiet"],
+      "moonrun",
+      [artifact, "--", destination, "--user", "tester", "--quiet"],
       cwd=temporary,
     ),
   )
