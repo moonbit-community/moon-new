@@ -33,16 +33,10 @@ async fn existing_username(warnings : Array[String]) -> String? {
   defer file.close()
   try {
     let value = @json.parse(file.read_all().text())
-    guard value is { "token": String(_), .. } else {
-      warnings.push(
-        "Invalid credentials fields; using default username. Log in again with moon login or pass --user.",
-      )
-      return None
-    }
     match value {
-      { "username": String(username), .. } => Some(username)
-      { "username": Null, .. } => None
-      { "username"? : None, .. } => None
+      { "token": String(_), "username": String(username), .. } => Some(username)
+      { "token": String(_), "username": Null, .. }
+      | { "token": String(_), "username"? : None, .. } => None
       _ => {
         warnings.push(
           "Invalid credentials fields; using default username. Log in again with moon login or pass --user.",
