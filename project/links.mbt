@@ -1,4 +1,54 @@
 ///|
+/// Preserve links when possible; otherwise copy only rendered project contents.
+async fn create_link(
+  destination : String,
+  relative : String,
+  target : String,
+  entries : Map[String, @template.Entry],
+  created : Array[CreatedPath],
+  warnings : Array[String],
+) -> Unit {
+  let path = join_path(destination, relative)
+  try {
+    @fs.symlink(target~, path, force_symlink=true)
+    created.push(File(path))
+  } catch {
+    err => {
+      // A case-folded alias may already exist on this filesystem.
+      // Never treat a collision as permission to copy through that path.
+      if existing_kind(path) is Some(_) {
+        raise CreationError("Output path collision at \{relative}: \{err}")
+      }
+      warnings.push(
+        "Could not create symbolic link \{path}; copying instead: \{err}",
+      )
+      let source = link_copy_source(relative, target)
+      copy_target(source, path, entries, created, warnings, [])
+    }
+  }
+}
+
+///|
+/// Validate the raw target before joining it to its link's project-relative parent.
+fn link_copy_source(
+  path : String,
+  target : String,
+) -> String raise CreationError {
+  if target.has_prefix("/") ||
+    target.contains("\\") ||
+    target.contains(":") ||
+    target == "" {
+    raise CreationError(
+      "Invalid or external symbolic-link copy target: \{path}",
+    )
+  }
+  match path.rev_split_once("/") {
+    Some((parent, _)) => parent.to_owned() + "/" + target
+    None => target
+  }
+}
+
+///|
 /// Resolve against the rendered inventory, never the destination filesystem.
 /// Follow links before processing later ".." components, like path traversal.
 fn resolve_copy_target(
@@ -35,17 +85,7 @@ fn resolve_copy_target(
         if links.contains(current) {
           raise CreationError("Cyclic symbolic-link copy target: \{current}")
         }
-        ignore(resolved.pop())
-        if target.has_prefix("/") ||
-          target.contains("\\") ||
-          target.contains(":") ||
-          target == "" {
-          raise CreationError(
-            "Invalid or external symbolic-link copy target: \{current}",
-          )
-        }
-        let parent = resolved.join("/")
-        let next = (if parent == "" { "" } else { parent + "/" }) + target
+        let next = link_copy_source(current, target)
         let target = resolve_copy_target(next, entries, links + [current])
         if entries.get(target) is Some(File(..)) && i != parts.length() - 1 {
           raise CreationError(

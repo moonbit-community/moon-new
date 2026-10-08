@@ -157,37 +157,7 @@ pub async fn create(
     }
     for entry in entries {
       if entry is Link(path=relative, target~) {
-        let path = join_path(destination, relative)
-        try {
-          @fs.symlink(target~, path, force_symlink=true)
-          created.push(File(path))
-        } catch {
-          err => {
-            // A case-folded alias may already exist on this filesystem.
-            // Never treat a collision as permission to copy through that path.
-            if existing_kind(path) is Some(_) {
-              raise CreationError(
-                "Output path collision at \{relative}: \{err}",
-              )
-            }
-            warnings.push(
-              "Could not create symbolic link \{path}; copying instead: \{err}",
-            )
-            if target.has_prefix("/") ||
-              target.contains("\\") ||
-              target.contains(":") ||
-              target == "" {
-              raise CreationError(
-                "Invalid or external symbolic-link copy target: \{relative}",
-              )
-            }
-            let parent = relative.split("/").to_array()
-            ignore(parent.pop())
-            let prefix = parent.map(part => part.to_owned()).join("/")
-            let source = (if prefix == "" { "" } else { prefix + "/" }) + target
-            copy_target(source, path, inventory, created, warnings, [])
-          }
-        }
+        create_link(destination, relative, target, inventory, created, warnings)
       }
     }
   } catch {
