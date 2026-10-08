@@ -2,7 +2,7 @@
 fn remote_url(source : String) -> String? raise @object.GitError {
   if source.has_prefix("https://") {
     let authority = source[8:].split("/").next().unwrap_or("")
-    guard authority != "" &&
+    guard !authority.is_empty() &&
       !authority.contains("@") &&
       !authority.contains("%") &&
       !source.contains("?") &&

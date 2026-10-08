@@ -4,16 +4,16 @@ fn validate_names(
   name : String,
   warnings : Array[String],
 ) -> Unit raise CreationError {
-  if username == "" ||
-    !username.iter().all(c => @unicode.is_alphanum(c) || c == '-' || c == '_') {
+  if username.is_empty() ||
+    !username.iter().all(c => @unicode.is_alphanum(c) || c is ('-' | '_')) {
     raise CreationError(
       "Usernames can only contain Unicode alphanumeric characters, dashes (-), and underscores (_), and must not be empty.",
     )
   }
   let mut first = true
   for c in name {
-    let letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
-    if !(letter || (!first && ((c >= '0' && c <= '9') || c == '-'))) {
+    let letter = c is ('a'..='z' | 'A'..='Z' | '_')
+    if !(letter || (!first && c is ('0'..='9' | '-'))) {
       raise CreationError(
         "Invalid project name: \{name}. Expected [A-Za-z_][A-Za-z0-9_-]*.",
       )

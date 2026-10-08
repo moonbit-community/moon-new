@@ -13,14 +13,14 @@ async fn create_link(
     @fs.symlink(target~, path, force_symlink=true)
     created.push(File(path))
   } catch {
-    err => {
+    error => {
       // A case-folded alias may already exist on this filesystem.
       // Never treat a collision as permission to copy through that path.
       if existing_kind(path) is Some(_) {
-        raise CreationError("Output path collision at \{relative}: \{err}")
+        raise CreationError("Output path collision at \{relative}: \{error}")
       }
       warnings.push(
-        "Could not create symbolic link \{path}; copying instead: \{err}",
+        "Could not create symbolic link \{path}; copying instead: \{error}",
       )
       let source = link_copy_source(relative, target)
       copy_target(source, path, entries, created, warnings, [])
@@ -37,7 +37,7 @@ fn link_copy_source(
   if target.has_prefix("/") ||
     target.contains("\\") ||
     target.contains(":") ||
-    target == "" {
+    target.is_empty() {
     raise CreationError(
       "Invalid or external symbolic-link copy target: \{path}",
     )
@@ -60,7 +60,7 @@ fn resolve_copy_target(
     path.contains("\\") ||
     path.contains(":") ||
     path.contains("\u0000") ||
-    path == "" {
+    path.is_empty() {
     raise CreationError(
       "Invalid or external symbolic-link copy target: \{path}",
     )
@@ -68,7 +68,7 @@ fn resolve_copy_target(
   let parts = path.split("/").map(part => part.to_owned()).to_array()
   let resolved : Array[String] = []
   for i, part in parts {
-    if part == "" || part == "." {
+    if part.is_empty() || part == "." {
       continue
     }
     if part == ".." {
@@ -93,7 +93,7 @@ fn resolve_copy_target(
           )
         }
         resolved.clear()
-        if target != "" {
+        if !target.is_empty() {
           resolved.append(
             target.split("/").map(part => part.to_owned()).to_array(),
           )
@@ -135,7 +135,7 @@ async fn copy_target(
       raise CreationError("Unresolved symbolic-link copy target: \{source}")
     None => {
       ensure_directory(destination, created)
-      let prefix = if source == "" { "" } else { source + "/" }
+      let prefix = if source.is_empty() { "" } else { source + "/" }
       let children : Set[String] = Set([])
       for path in entries.keys() {
         if path.has_prefix(prefix) {

@@ -8,7 +8,7 @@ fn credentials_path() -> String? {
   // native and Wasm. If unavailable, the caller warns and uses the default
   // username; users can set MOON_HOME or bypass lookup with --user.
   let root = if @async.platform is Windows {
-    @env.get_env_var("USERPROFILE").filter(value => value != "")
+    @env.get_env_var("USERPROFILE").filter(value => !value.is_empty())
   } else {
     @env.get_env_var("HOME")
   }

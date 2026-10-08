@@ -26,7 +26,7 @@ pub async fn load(
         "--branch, --tag and --rev are mutually exclusive",
       )
   }
-  let components = if subdir == "" || subdir == "." {
+  let components = if subdir.is_empty() || subdir == "." {
     []
   } else {
     subdir.split("/").map(part => part.to_owned()).to_array()
@@ -65,11 +65,11 @@ pub async fn load(
     } else if selected is None {
       selected = @protocol.select_default_ref(refs, symrefs).map(pair => pair.1)
     }
-    let id = selected.unwrap_or_else(() => {
+    guard selected is Some(id) else {
       raise @object.GitError::InvalidObject(
         "Remote Git revision not found: \{requested}",
       )
-    })
+    }
     let store = @repo.ObjectStore::from_pack(
       @protocol.fetch_objects_with_http(
         remote,
@@ -82,36 +82,33 @@ pub async fn load(
       ),
     )
     return read_commit(id, components, id => {
-      store
-      .get(id)
-      .unwrap_or_else(() => {
+      guard store.get(id) is Some(object) else {
         raise @object.GitError::InvalidObject("Missing Git object: \{id}")
-      })
+      }
+      object
     })
   }
   let disk = Disk::{ }
-  let git_dir = match git_directory(disk, source) {
-    Some((directory, _)) => directory
-    None => raise @object.GitError::IoError("Not a Git repository: \{source}")
+  guard git_directory(disk, source) is Some((git_dir, _)) else {
+    raise @object.GitError::IoError("Not a Git repository: \{source}")
   }
   let selected = match (refname, revision) {
     (Some(name), _) => @git.resolve_ref(disk, git_dir, name)
     (None, Some(id)) => Some(id)
     (None, None) => @git.resolve_head_commit(disk, git_dir)
   }
-  let id = selected.unwrap_or_else(() => {
+  guard selected is Some(id) else {
     raise @object.GitError::InvalidObject(
       "Git revision not found in \{source}: \{requested}",
     )
-  })
+  }
   let db = @git.ObjectDb::load_lazy(disk, git_dir)
   db.disable_commit_graph()
   read_commit(id, components, id => {
-    db
-    .get(disk, id)
-    .unwrap_or_else(() => {
+    guard db.get(disk, id) is Some(object) else {
       raise @object.GitError::InvalidObject("Missing Git object: \{id}")
-    })
+    }
+    object
   })
 }
 
@@ -123,26 +120,25 @@ fn read_commit(
 ) -> Array[Entry] raise {
   let mut commit = get(id)
   let seen : Set[@object.ObjectId] = Set([])
-  while commit.obj_type == Tag {
+  while commit.obj_type is Tag {
     guard !seen.contains(commit.id) else {
       raise @object.GitError::InvalidObject("Cyclic annotated tag: \{id}")
     }
     seen.add(commit.id)
-    let target = @git.parse_tag_object(@utf8.decode(commit.data)).unwrap_or_else(() => {
-        raise @object.GitError::InvalidObject(
-          "Invalid annotated tag: \{commit.id}",
-        )
-      },
-    )
+    guard @git.parse_tag_object(@utf8.decode(commit.data)) is Some(target) else {
+      raise @object.GitError::InvalidObject(
+        "Invalid annotated tag: \{commit.id}",
+      )
+    }
     commit = get(target)
   }
-  guard commit.obj_type == Commit else {
+  guard commit.obj_type is Commit else {
     raise @object.GitError::InvalidObject("Expected a commit: \{id}")
   }
   let mut tree_id = @repo.parse_commit(commit.data).tree
   for component in components {
     let tree = get(tree_id)
-    guard tree.obj_type == Tree else {
+    guard tree.obj_type is Tree else {
       raise @object.GitError::InvalidObject("Expected a tree: \{tree_id}")
     }
     let mut found = None
@@ -172,7 +168,7 @@ fn read_tree(
   entries : Array[Entry],
 ) -> Unit raise {
   let tree = get(id)
-  guard tree.obj_type == Tree else {
+  guard tree.obj_type is Tree else {
     raise @object.GitError::InvalidObject("Expected a tree: \{id}")
   }
   for entry in @repo.parse_tree(tree.data) {
@@ -191,7 +187,7 @@ fn read_tree(
         )
       }
       let blob = get(entry.id)
-      guard blob.obj_type == Blob else {
+      guard blob.obj_type is Blob else {
         raise @object.GitError::InvalidObject("Expected a blob: \{path}")
       }
       entries.push({ path, mode: entry.mode, content: blob.data, })

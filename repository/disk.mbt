@@ -47,7 +47,7 @@ impl @types.FileSystem for Disk with fn mkdir_p(self, path) {
     return
   }
   let parent = @path.Path(path).dirname().to_string()
-  if parent != path && parent != "" {
+  if parent != path && !parent.is_empty() {
     @types.FileSystem::mkdir_p(self, parent)
   }
   @sync_fs.create_dir(path) catch {

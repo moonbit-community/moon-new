@@ -15,7 +15,7 @@ async test "unsupported transports and authenticated URLs fail before network ac
 }
 
 ///|
-async test "repository reads its committed root on both supported targets" {
+async test "repository reads its committed root" {
   let entries = @repository.load(".")
   assert_true(entries.any(entry => entry.path == "moon.mod"))
   assert_false(entries.any(entry => entry.path.has_prefix(".git/")))

@@ -16,7 +16,7 @@ pub async fn initialize(destination : String) -> Bool {
       return false
     }
     let parent = @path.Path(current).dirname().to_string()
-    if parent == current || parent == "" {
+    if parent == current || parent.is_empty() {
       break
     }
     current = parent

@@ -24,7 +24,7 @@ async test "CLI matches the independent official fixture" {
   }
   for path, target in links {
     guard target is String(target) else { fail("invalid fixture link") }
-    if @fs.kind(s.root + "/hello/" + path, follow_symlink=false) == SymLink {
+    if @fs.kind(s.root + "/hello/" + path, follow_symlink=false) is SymLink {
       assert_eq(
         @fs.realpath(s.root + "/hello/" + path),
         @fs.realpath(s.root + "/hello/" + target),
@@ -45,7 +45,7 @@ async test "CLI matches the independent official fixture" {
   if !windows() {
     assert_eq(permission(s.root + "/hello/.githooks/pre-commit"), "755")
   }
-  assert_eq(@fs.kind(s.root + "/hello/.git"), Directory)
+  assert_true(@fs.kind(s.root + "/hello/.git") is Directory)
 }
 
 ///|
@@ -125,7 +125,7 @@ async test "CLI names and argument forms" {
   for name in ["", "0hello", "a.b", "a/b", "用户"] {
     let result = s.run(["invalid", "--name", name, "--user", "tester"])
     assert_eq(result.status, 1)
-    let expected = if name == "" {
+    let expected = if name.is_empty() {
       "Project name must not be empty."
     } else {
       "Invalid project name: \{name}. Expected [A-Za-z_][A-Za-z0-9_-]*."

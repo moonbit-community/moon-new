@@ -54,7 +54,7 @@ fn validate_paths(entries : Array[Entry]) -> Unit raise TemplateError {
     }
     let components = path.split("/").map(part => part.to_owned()).to_array()
     for component in components {
-      if component == "" ||
+      if component.is_empty() ||
         component == "." ||
         component == ".." ||
         component.to_lower() == ".git" ||
@@ -99,7 +99,7 @@ fn validate_paths(entries : Array[Entry]) -> Unit raise TemplateError {
     }
     let mut parent = ""
     for i in 0..<(components.length() - 1) {
-      parent = if parent == "" {
+      parent = if parent.is_empty() {
         components[i]
       } else {
         parent + "/" + components[i]

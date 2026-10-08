@@ -105,10 +105,7 @@ async test "template failures report source paths and leave destinations untouch
       destination, "--template", "./source", "--subdir", name, "--name", "demo",
     ])
     assert_eq(again.status, 1)
-    assert_eq(
-      @fs.readdir(s.root + "/" + destination, include_hidden=true).length(),
-      0,
-    )
+    assert_eq(@fs.readdir(s.root + "/" + destination, include_hidden=true), [])
   }
   assert_false(s.exists("escaped"))
 }
@@ -258,9 +255,9 @@ async test "failed symlinks copy generated files and directories and reject unsa
       assert_eq(result.status, 0, msg=result.stderr)
       let file = if name == "directory" { "link/data" } else { "link" }
       assert_eq(s.read("out-" + name + "/" + file), "demo")
-      assert_true(
-        @fs.kind(s.root + "/out-" + name + "/link", follow_symlink=false) !=
-        SymLink,
+      assert_false(
+        @fs.kind(s.root + "/out-" + name + "/link", follow_symlink=false)
+        is SymLink,
       )
     } else {
       assert_eq(result.status, 1, msg=name)
@@ -360,7 +357,7 @@ async test "Git template write failures roll back files and preserve existing em
     ])
     assert_eq(result.status, 1)
     if destination == "empty" {
-      assert_eq(@fs.readdir(s.root + "/empty", include_hidden=true).length(), 0)
+      assert_eq(@fs.readdir(s.root + "/empty", include_hidden=true), [])
     } else {
       assert_false(s.exists("new"))
     }
@@ -436,7 +433,7 @@ async test "case aliases in link ancestors cannot write outside the project" {
   let insensitive = s.exists("PROBE")
   let result = s.run(["out", "--template", "./source", "--user", "alice"])
   assert_eq(result.status, if insensitive { 1 } else { 0 }, msg=result.stderr)
-  assert_eq(@fs.readdir(s.root + "/outside", include_hidden=true).length(), 0)
+  assert_eq(@fs.readdir(s.root + "/outside", include_hidden=true), [])
   if insensitive {
     assert_false(s.exists("out"))
   }

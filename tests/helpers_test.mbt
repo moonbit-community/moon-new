@@ -87,7 +87,7 @@ async fn command(
     program,
     args,
     cwd~,
-    extra_env=env.unwrap_or({}),
+    extra_env=env.unwrap_or(Map([])),
     inherit_env=env is None,
   )
   { status, stdout: stdout.text(), stderr: stderr.text(), }
@@ -145,7 +145,7 @@ async fn files(directory : String, prefix? : String = "") -> Array[String] {
       continue
     }
     let relative = prefix + name
-    if @fs.kind(directory + "/" + name, follow_symlink=false) == Directory {
+    if @fs.kind(directory + "/" + name, follow_symlink=false) is Directory {
       result.append(files(directory + "/" + name, prefix=relative + "/"))
     } else {
       result.push(relative)

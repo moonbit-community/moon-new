@@ -19,8 +19,8 @@ priv enum CreatedPath {
 ///|
 async fn existing_kind(path : String) -> @fs.FileKind? {
   Some(@fs.kind(path, follow_symlink=false)) catch {
-    @os_error.OSError(_) as err if err.is_ENOENT() => None
-    err => raise err
+    @os_error.OSError(_) as error if error.is_ENOENT() => None
+    error => raise error
   }
 }
 
@@ -32,7 +32,7 @@ async fn ensure_directory(path : String, created : Array[CreatedPath]) -> Unit {
     None => ()
   }
   let parent = @path.Path(path).dirname().to_string()
-  if parent != path && parent != "" {
+  if parent != path && !parent.is_empty() {
     ensure_directory(parent, created)
   }
   // Creating an ancestor may have made a `..` component resolvable.
@@ -62,7 +62,7 @@ async fn write_new(
   file.write(content)
   if executable && !(@async.platform is Windows) {
     @fs.chmod(path, 0o755) catch {
-      err => warnings.push("Could not make \{path} executable: \{err}")
+      error => warnings.push("Could not make \{path} executable: \{error}")
     }
   }
 }
@@ -100,7 +100,10 @@ pub async fn create(
     Some(user) => user
     None => existing_username(warnings).unwrap_or("username")
   }
-  let name = name.unwrap_or_else(() => inferred_name(destination))
+  let name = match name {
+    Some(name) => name
+    None => inferred_name(destination)
+  }
   validate_names(username, name, warnings)
   let entries = match template {
     Some(source) =>

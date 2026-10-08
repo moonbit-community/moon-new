@@ -76,7 +76,7 @@ fn select(
     .map(path => {
       let parts = path
         .split("/")
-        .filter(part => part != "." && part != "")
+        .filter(part => part != "." && !part.is_empty())
         .to_array()
       guard !path.has_prefix("/") &&
         !path.contains("\\") &&
@@ -92,7 +92,7 @@ fn select(
     if path == "moon.new.json" ||
       path.split("/").any(part => part.to_lower() == ".git") ||
       ignored.any(prefix => {
-        prefix == "" || path == prefix || path.has_prefix(prefix + "/")
+        prefix.is_empty() || path == prefix || path.has_prefix(prefix + "/")
       }) {
       continue
     }
