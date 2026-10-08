@@ -10,18 +10,13 @@ fn validate_names(
       "Usernames can only contain Unicode alphanumeric characters, dashes (-), and underscores (_), and must not be empty.",
     )
   }
-  let mut first = true
-  for c in name {
-    let letter = c is ('a'..='z' | 'A'..='Z' | '_')
-    if !(letter || (!first && c is ('0'..='9' | '-'))) {
+  lexmatch name {
+    re"^$" => raise CreationError("Project name must not be empty.")
+    re"^[A-Za-z_][A-Za-z0-9_\-]*$" => ()
+    _ =>
       raise CreationError(
         "Invalid project name: \{name}. Expected [A-Za-z_][A-Za-z0-9_-]*.",
       )
-    }
-    first = false
-  }
-  if first {
-    raise CreationError("Project name must not be empty.")
   }
   if name.has_suffix("_test") || name.has_suffix("_wbtest") {
     warnings.push(
