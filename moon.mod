@@ -6,6 +6,8 @@ readme = "README.mbt.md"
 
 license = "Apache-2.0"
 
+repository = "https://github.com/moonbit-community/moon-new"
+
 preferred_target = "wasm"
 
 description = "A MoonBit project generator with support for Git repository templates."
