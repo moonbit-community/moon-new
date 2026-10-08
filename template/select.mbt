@@ -15,7 +15,7 @@ pub extend TemplateError with Show::{output, to_string}
 ///|
 /// Apply the selected root's moon.new.json. Each result pairs an entry with
 /// whether its contents should be rendered. Paths and link targets always render.
-pub fn select(
+fn select(
   entries : Array[@repository.Entry],
   warnings? : Array[String] = [],
 ) -> Array[(@repository.Entry, Bool)] raise {

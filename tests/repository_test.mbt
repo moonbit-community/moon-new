@@ -141,15 +141,37 @@ async test "template matching uses source paths, nearest matches and root-local 
     ),
   )
   for (name, _, expected) in cases {
-    let selected = @template.select(@repository.load(source, subdir=name))
-    assert_eq(selected.length(), 4, msg=name)
-    let rendered = selected.filter(pair => pair.1).map(pair => pair.0.path)
+    let output = @template.render_repository(
+      @repository.load(source, subdir=name),
+      "tester",
+      "hello",
+    )
+    assert_eq(output.length(), 4, msg=name)
+    let rendered = []
+    for entry in output {
+      guard entry is File(path~, content~, ..) else {
+        fail("Expected an ordinary file")
+      }
+      if content == b"hello" {
+        rendered.push(path)
+      } else {
+        assert_eq(content, b"{{module}}", msg=path)
+      }
+    }
+    let expected = expected.map(path => {
+      path.replace(old="{{module}}", new="hello")
+    })
     rendered.sort()
     expected.sort()
     assert_eq(rendered, expected, msg=name)
   }
   assert_true(
-    @template.select(@repository.load(source, subdir="no_config"))[0].1,
+    @template.render_repository(
+      @repository.load(source, subdir="no_config"),
+      "tester",
+      "hello",
+    )[0]
+    is File(content=b"hello", ..),
   )
 }
 
@@ -213,7 +235,7 @@ async test "template validation rejects malformed config, binary rendering, subm
   )
   for (name, _, message) in invalid {
     let entries = @repository.load(source, subdir=name)
-    try @template.select(entries) catch {
+    try @template.render_repository(entries, "tester", "hello") catch {
       error =>
         assert_true(error.to_string().contains(message), msg=error.to_string())
     } noraise {
@@ -221,7 +243,11 @@ async test "template validation rejects malformed config, binary rendering, subm
     }
   }
   assert_eq(
-    @template.select(@repository.load(source, subdir="ignored")).length(),
+    @template.render_repository(
+      @repository.load(source, subdir="ignored"),
+      "tester",
+      "hello",
+    ).length(),
     0,
   )
 }
@@ -253,17 +279,30 @@ async test "template rules distinguish byte copies, literal omissions and conten
   )
   let warnings = []
   let entries = @repository.load(source)
-  let selected = @template.select(entries, warnings~)
-  assert_eq(selected.length(), 5)
-  assert_true(selected.any(pair => pair.0.path == "src/keep.txt" && pair.1))
-  assert_true(selected.any(pair => pair.0.path == "src/omit.txt" && pair.1))
-  assert_true(selected.any(pair => pair.0.path == "src/x.txt" && pair.1))
-  assert_true(selected.any(pair => pair.0.path == "src/raw.txt" && !pair.1))
-  assert_true(
-    selected.any(pair => {
-      pair.0.path == "binary" && !pair.1 && pair.0.content == b"\x00\xff"
-    }),
+  let output = @template.render_repository(
+    entries,
+    "tester",
+    "hello",
+    warnings~,
   )
+  assert_eq(output.length(), 5)
+  for
+    (expected_path, expected_content) in [
+      ("src/keep.txt", b"hello"),
+      ("src/omit.txt", b"hello"),
+      ("src/x.txt", b"hello"),
+      ("src/raw.txt", b"{{module}}"),
+      ("binary", b"\x00\xff"),
+    ] {
+    assert_true(
+      output.any(entry => {
+        entry is File(path~, content~, ..) &&
+        path == expected_path &&
+        content == expected_content
+      }),
+      msg=expected_path,
+    )
+  }
   assert_eq(warnings.length(), 1)
   assert_true(warnings[0].contains("exclude"))
 }
