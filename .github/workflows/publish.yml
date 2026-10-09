@@ -1,0 +1,64 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-mooncakes
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main branch
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Error: packages must be published from main."
+            exit 1
+          fi
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Install MoonBit
+        shell: bash
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Validate Wasm and the package archive
+        shell: bash
+        run: |
+          moon version --all
+          moon update
+          moon check --target wasm --deny-warn
+          moon build --target wasm
+          moon test --target wasm
+          moon info
+          moon fmt
+          git diff --exit-code
+          untracked_mbti="$(git ls-files --others --exclude-standard -- pkg.generated.mbti ':(glob)**/pkg.generated.mbti')"
+          if [ -n "$untracked_mbti" ]; then
+            echo "moon info generated untracked interface files:"
+            printf '%s\n' "$untracked_mbti"
+            exit 1
+          fi
+      - name: Publish to Mooncakes
+        env:
+          MOONCAKES_CREDENTIALS: ${{ secrets.MOONCAKES_MOONBIT_COMMUNITY_TOKEN }}
+        shell: bash
+        run: |
+          if [ -z "$MOONCAKES_CREDENTIALS" ]; then
+            echo "Error: MOONCAKES_MOONBIT_COMMUNITY_TOKEN secret is not set."
+            echo "Please contact an admin to grant this repository access to the secret."
+            exit 1
+          fi
+          credentials="$HOME/.moon/credentials.json"
+          mkdir -p "$(dirname "$credentials")"
+          trap 'rm -f "$credentials"' EXIT
+          (umask 077; printf '%s\n' "$MOONCAKES_CREDENTIALS" > "$credentials")
+          chmod 600 "$credentials"
+          moon publish
