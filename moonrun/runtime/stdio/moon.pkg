@@ -1,0 +1,13 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/core/cmp",
+  "moonbitlang/async/stdio" @native_stdio,
+  "moonbitlang/async/os_error",
+  "moonbit-community/moonrun/resource",
+  "moonbit-community/moonrun/async_sys" @sys,
+  "moonbitlang/core/encoding/utf8",
+}
+
+options(
+  supported_targets: "native",
+)

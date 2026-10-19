@@ -2,7 +2,8 @@
 package "moonbit-community/moonrun/runtime"
 
 import {
-  "moonbitlang/core/debug",
+  "moonbit-community/moonrun/policy",
+  "moonbit-community/moonrun/run_termination",
 }
 
 // Values
@@ -15,14 +16,7 @@ pub struct Module {
 }
 pub fn Module::from_bytes(Bytes, name? : String) -> Self raise
 pub async fn Module::load_file(String) -> Self
-pub async fn Module::run(Self, args? : Array[String], env? : Map[String, String], cwd? : String, stdin? : () -> Bytes, stdout? : (Bytes) -> Unit, stderr? : (Bytes) -> Unit, test_args? : String, control? : RunControl, policy? : Policy) -> RunOutcome
-
-pub struct Policy {
-  // private fields
-}
-pub async fn Policy::from_inherited_handle(String) -> Self
-pub async fn Policy::from_json(String, source_dir? : String) -> Self
-pub async fn Policy::load_file(String, source_dir? : String) -> Self
+pub async fn Module::run(Self, args? : Array[String], env? : Map[String, String], cwd? : String, stdin? : () -> Bytes, stdout? : (Bytes) -> Unit, stderr? : (Bytes) -> Unit, test_args? : String, control? : RunControl, policy? : @policy.Policy) -> @run_termination.RunOutcome
 
 pub struct RunControl {
   // private fields
@@ -30,16 +24,9 @@ pub struct RunControl {
 pub fn RunControl::RunControl() -> Self
 pub fn RunControl::send_signal(Self, Int32) -> Bool raise
 
-pub(all) enum RunOutcome {
-  Completed
-  Exited(Int32)
-  Signaled(Int32)
-  Trapped(String)
-} derive(Eq, @debug.Debug)
-pub fn RunOutcome::equal(Self, Self) -> Bool
-pub fn RunOutcome::not_equal(Self, Self) -> Bool
-pub fn RunOutcome::to_repr(Self) -> @debug.Repr
-
 // Type aliases
+pub using @policy {type Policy}
+
+pub using @run_termination {type RunOutcome}
 
 // Traits

@@ -1,0 +1,38 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moonrun/runtime/state"
+
+import {
+  "moonbit-community/moonrun/async_host",
+  "moonbit-community/moonrun/filesystem",
+  "moonbit-community/moonrun/network",
+  "moonbit-community/moonrun/policy",
+  "moonbit-community/moonrun/process",
+  "moonbit-community/moonrun/run_termination",
+  "moonbit-community/moonrun/runtime/handles",
+  "moonbit-community/moonrun/runtime/stdio",
+  "moonbitlang/async",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct Runtime {
+  args : Array[String]
+  env : Map[String, String]
+  cwd : String
+  policy : @policy.Policy?
+  handles : @handles.Handles
+  stdio : @stdio.Stdio
+  filesystem : @filesystem.HostFs
+  network : @network.HostNetwork
+  process : @process.HostProcess
+  async_host : @async_host.AsyncHost
+}
+pub fn Runtime::Runtime(String, Array[String], Map[String, String], String, (() -> Bytes)?, ((Bytes) -> Unit)?, ((Bytes) -> Unit)?, @async.TaskGroup[@run_termination.RunOutcome], @policy.Policy?) -> Self
+pub fn Runtime::close(Self) -> Unit
+
+// Type aliases
+
+// Traits

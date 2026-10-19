@@ -1,0 +1,99 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moonrun/resource"
+
+import {
+  "moonbit-community/moonrun/run_termination",
+  "moonbitlang/async",
+  "moonbitlang/async/cond_var",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/raw_fd",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) enum IoOperation {
+  Read
+  Write
+  Receive(Bytes)
+  Send(Bytes)
+  Connect(Bytes)
+  Accept(Int32)
+  WatchDirectory(FixedArray[Byte])
+}
+pub fn IoOperation::event(Self) -> Int32
+
+pub(all) struct IoResult {
+  operation : IoOperation
+  length : Int32
+  data : Bytes
+  position : Int64
+  flags : Int32
+  mut task : @async.Task[Unit]?
+  mut result : JobResult?
+  mut pending : Bool
+  mut fd : Int64?
+  mut peer : Bytes?
+}
+
+pub(all) struct JobResult {
+  ret : Int32
+  errno : Int32
+  data : Bytes
+  mut opened : Resource?
+}
+
+pub(all) struct Resource {
+  owner : ResourceKind
+  read_lock : @async.Mutex
+  write_lock : @async.Mutex
+  cursor_lock : @async.Mutex
+  mut cursor : Int64
+  append : Bool
+  guest_async : Bool
+  mut path : String?
+  // private fields
+}
+pub fn Resource::Resource(ResourceKind, append? : Bool, guest_async? : Bool, path? : String) -> Self
+pub fn Resource::native(Self) -> Int32
+pub fn Resource::new_socket(Int32, @async.TaskGroup[@run_termination.RunOutcome]) -> Self raise
+pub async fn Resource::read_job(Self, Int32, Int64, flags? : Int32) -> JobResult
+pub fn Resource::release(Self) -> Unit
+pub fn Resource::retain(Self) -> Unit
+pub async fn Resource::write_job(Self, Bytes, Int64, flags? : Int32) -> JobResult
+
+pub(all) enum ResourceKind {
+  Pipe(@raw_fd.RawFd, Bool)
+  File(@fs.File)
+  Standard(Int32, Int32)
+  Socket(Socket)
+  Watcher(Watcher)
+}
+
+pub struct Socket {
+  fd : Int32
+  read : @cond_var.Cond
+  write : @cond_var.Cond
+  mut read_sequence : Int64
+  mut write_sequence : Int64
+  mut pump : @async.Task[Unit]?
+  mut closed : Bool
+  mut connect_error : Int32?
+}
+pub fn Socket::close(Self) -> Unit
+pub async fn Socket::connect(Self, Bytes) -> Unit
+pub async fn Socket::read(Self, FixedArray[Byte], Int32) -> Int32
+pub async fn Socket::wait_read(Self, Int64) -> Unit
+pub async fn Socket::wait_write(Self, Int64) -> Unit
+pub async fn Socket::write(Self, Bytes, Int32) -> Int32
+
+pub(all) struct Watcher {
+  fd : Int32
+  files : Map[Int64, Int64]
+}
+
+// Type aliases
+
+// Traits

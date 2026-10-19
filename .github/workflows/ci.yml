@@ -42,8 +42,14 @@ jobs:
           moon check --deny-warn
           moon build
           moon test
-          moon info
           moon fmt
+          git diff --exit-code
+      - name: Check generated interfaces
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          # Native descriptor types differ between Unix and Windows.
+          moon info
           git diff --exit-code
       - name: Test moonrun against compiled fixtures
         shell: bash

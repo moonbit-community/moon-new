@@ -1,0 +1,20 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/core/cmp",
+  "moonbit-community/moonrun/runtime/handles",
+  "moonbitlang/async/os_error",
+  "moonbitlang/async/pipe",
+  "moonbit-community/moonrun/policy",
+  "moonbitlang/async/raw_fd",
+  "moonbit-community/moonrun/resource",
+  "moonbit-community/moonrun/runtime/stdio",
+  "moonbit-community/moonrun/async_sys" @sys,
+  "moonbit-community/moonrun/run_termination" @termination,
+  "moonbitlang/async/types",
+  "moonbitlang/core/encoding/utf16",
+  "moonbitlang/core/encoding/utf8",
+}
+
+options(
+  supported_targets: "native",
+)

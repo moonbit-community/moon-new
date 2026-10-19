@@ -1,0 +1,42 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moonrun/filesystem/job"
+
+import {
+  "moonbit-community/moonrun/filesystem",
+  "moonbit-community/moonrun/resource",
+}
+
+// Values
+pub async fn open(@filesystem.HostFs, String, Int32, Int32, Bool, Int32, Int32, Int32, Int32) -> @resource.JobResult
+
+pub async fn path_job(@filesystem.HostFs, PathOperation, String, Int32) -> @resource.JobResult
+
+pub async fn read_directory(@resource.Resource, FixedArray[Byte], Int32, Bool) -> @resource.JobResult
+
+pub async fn rename_or_symlink(@filesystem.HostFs, Bool, String, String, Bool) -> @resource.JobResult
+
+pub async fn resource_job(@filesystem.HostFs, @resource.Resource, ResourceOperation, Int32, Int32) -> @resource.JobResult
+
+pub async fn stat(@filesystem.HostFs, String, @resource.Resource?, Bool, Int32, Int32) -> @resource.JobResult
+
+// Errors
+
+// Types and methods
+pub(all) enum PathOperation {
+  Remove
+  RemoveDirectory
+  CreateDirectory
+  Chmod
+  Access
+  Realpath
+}
+
+pub(all) enum ResourceOperation {
+  Stat
+  Sync
+  Lock
+}
+
+// Type aliases
+
+// Traits

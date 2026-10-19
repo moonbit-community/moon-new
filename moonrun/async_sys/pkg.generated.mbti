@@ -1,0 +1,229 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moonrun/async_sys"
+
+import {
+  "moonbitlang/async/pipe",
+  "moonbitlang/async/socket",
+  "moonbitlang/core/ref",
+  "moonbitlang/core/set",
+}
+
+// Values
+pub fn accept_socket(Int32, Bytes, Int32) -> Int32
+
+pub fn adopt_policy_fd(UInt64) -> Int32
+
+pub fn allow_reuse_addr(Int32) -> Int32
+
+pub fn allow_reuse_port(Int32) -> Int32
+
+pub let bad_fd_errno : Int32
+
+pub fn begin_event_wait(NativeEventBus, Int32) -> Unit
+
+pub fn bind_socket(Int32, Bytes, Int32) -> Int32
+
+pub fn buffer_word(FixedArray[Byte], Int32, Int32) -> Int64 raise HostError
+
+pub fn buffered_pipe_bytes(Int32) -> Int32
+
+pub fn check_range(Int32, Int32, Int32) -> Unit raise HostError
+
+pub fn child_error(NativeChild) -> Int32
+
+pub fn child_handle(NativeChild) -> Int32
+
+pub fn child_is_null(NativeChild) -> Bool
+
+pub fn child_pid(NativeChild) -> Int32
+
+pub fn child_signal(NativeChild, Int32) -> Unit
+
+pub fn child_status(NativeChild) -> Int32
+
+pub fn close_event_bus(NativeEventBus) -> Unit
+
+pub fn close_guest_pipe(Int32) -> Int32
+
+pub fn close_socket(Int32) -> Unit
+
+pub fn connect_socket(Int32, Bytes, Int32) -> Int32
+
+pub fn copy_tmp_path(NativeTmpPath) -> Bytes
+
+pub fn create_event_bus(Int32) -> NativeEventBus
+
+pub fn create_guest_pipe(FixedArray[Int32], Bool, Bool) -> Int32
+
+pub fn create_watcher() -> Int32
+
+pub fn decode_address(Bytes) -> @socket.Addr raise HostError
+
+pub fn disable_nagle(Int32) -> Int32
+
+pub fn drain_completion(Int32) -> Int32
+
+pub fn enable_keepalive(Int32, Int32, Int32, Int32) -> Int32
+
+pub fn environment_key_equal(String, Int32, String, Int32) -> Bool
+
+pub fn event_bus_is_null(NativeEventBus) -> Bool
+
+pub fn event_bytes(NativeEventBus, Int32) -> Int32
+
+pub fn event_fd(NativeEventBus, Int32) -> Int64
+
+pub fn event_flags(NativeEventBus, Int32) -> Int32
+
+pub fn event_pid(NativeEventBus, Int32) -> Int32
+
+pub fn event_token(NativeEventBus, Int32) -> Int64
+
+pub fn event_wait_errno(NativeEventBus) -> Int32
+
+pub fn event_wait_result(NativeEventBus) -> Int32
+
+pub let fault_errno : Int32
+
+pub fn fd_cloexec(Int32) -> Int32
+
+pub fn fd_nonblocking(Int32) -> Int32
+
+pub fn fd_word(Int32) -> Int64
+
+pub fn find_ipv6_interface() -> UInt32
+
+pub fn free_child(NativeChild) -> Unit
+
+pub fn gai_message(Int32) -> Bytes
+
+pub fn init_ipv4_address(Bytes, UInt32, Int32) -> Unit
+
+pub fn init_ipv6_address(Bytes, Bytes, Int32, UInt32) -> Unit
+
+pub fn initialize_child_signals() -> Unit
+
+pub fn interface_index(Int32, Bytes) -> UInt32
+
+pub fn interface_name(Int32, UInt32) -> Bytes
+
+pub fn invalid_native_fd() -> Int32
+
+pub fn ipv4_address_size() -> Int32
+
+pub fn ipv6_address_size() -> Int32
+
+pub fn ipv6_bytes_offset() -> Int32
+
+pub fn join_child(NativeChild) -> Unit
+
+pub fn join_multicast(Int32, Bytes, Bytes) -> Int32
+
+pub fn join_multicast_v6(Int32, Bytes, UInt32) -> Int32
+
+pub fn listen_socket(Int32) -> Int32
+
+pub fn make_tcp_socket(Int32) -> Int32
+
+pub fn make_udp_socket(Int32, Bool) -> Int32
+
+pub fn native_error_message(Int32) -> Bytes
+
+pub fn native_pid() -> Int32
+
+pub fn native_process_fd_valid(Int32) -> Bool
+
+pub fn native_process_ready(Int32) -> Int32
+
+pub fn native_process_result(Int32, Int32, @ref.Ref[Int32]) -> Int32
+
+pub fn native_string(FixedArray[Byte], Int32, Int32) -> String raise HostError
+
+pub fn native_tmp_path() -> NativeTmpPath
+
+pub fn open_native_process(Int32) -> Int32
+
+pub fn post_completion(NativeEventBus, Int64, Int64, Int32) -> Int32
+
+pub fn prepare_socket(Int32) -> Int32
+
+pub fn read_guest_pipe(Int32, FixedArray[Byte], Int32) -> Int32
+
+pub fn register_child_pid(NativeEventBus, Int32) -> Int32
+
+pub fn register_completion_fd(NativeEventBus, Int32, Int64) -> Int32
+
+pub fn register_event_fd(NativeEventBus, Int32, Bool, Int64) -> Int32
+
+pub fn set_ipv6_only(Int32, Bool) -> Int32
+
+pub fn set_multicast_interface(Int32, Bytes) -> Int32
+
+pub fn set_multicast_interface_v6(Int32, UInt32) -> Int32
+
+pub fn set_multicast_loopback(Int32, Bool, Int32) -> Int32
+
+pub fn set_multicast_ttl(Int32, Int32, Int32) -> Int32
+
+pub fn signal_completion(Int32) -> Int32
+
+pub fn signal_process_pid(Int32, Int32) -> Unit
+
+pub fn socket_error(Int32) -> Int32
+
+pub fn socket_invalid(Int32) -> Bool
+
+pub fn socket_name(Int32, Bytes) -> Int32
+
+pub fn socket_read(Int32, FixedArray[Byte], Int32, Int32) -> Int32
+
+pub fn socket_recvfrom(Int32, FixedArray[Byte], Int32, Int32, Bytes, Int32) -> Int32
+
+pub fn socket_sendto(Int32, Bytes, Int32, Int32, Bytes, Int32) -> Int32
+
+pub fn socket_write(Int32, Bytes, Int32, Int32) -> Int32
+
+pub fn start_child(Bytes, Int32, Int32, Int32, Int32, Int32, Int32, Bool, Bool, Int32, Bytes, Int32) -> NativeChild
+
+pub fn watch_socket(NativeEventBus, Int32) -> Int32
+
+pub fn watcher_add_file(Int32, Int32, Bool) -> Int32
+
+pub fn watcher_buffer_size() -> Int32
+
+pub fn watcher_fetch(Int32, FixedArray[Byte], Int32) -> Int32
+
+pub fn watcher_remove_file(Int32, Int32) -> Int32
+
+pub fn write_guest_pipe(Int32, FixedArray[Byte], Int32) -> Int32
+
+// Errors
+pub(all) suberror HostError {
+  Invalid
+  Bounds
+  Operation(String)
+}
+
+// Types and methods
+pub struct EventBus {
+  native : NativeEventBus
+  read : @pipe.PipeRead
+  mut closed : Bool
+  registered : @set.Set[Int64]
+}
+pub fn EventBus::close(Self) -> Unit
+pub fn EventBus::new() -> Self raise
+pub async fn EventBus::wait(Self, Int32) -> Int32
+
+#external
+pub type NativeChild
+
+#external
+pub type NativeEventBus
+
+#external
+pub type NativeTmpPath
+
+// Type aliases
+
+// Traits

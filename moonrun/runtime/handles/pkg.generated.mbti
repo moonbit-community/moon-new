@@ -1,0 +1,17 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moonrun/runtime/handles"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct Handles {
+  // private fields
+}
+pub fn Handles::Handles() -> Self
+pub fn Handles::allocate(Self) -> Int64
+
+// Type aliases
+
+// Traits

@@ -1,0 +1,17 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moonrun/runtime/environment"
+
+// Values
+pub fn copy_environment(Map[String, String]) -> Map[String, String]
+
+pub fn environment_entry(Map[String, String], String) -> (String, String)?
+
+pub fn set_environment_entry(Map[String, String], String, String) -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

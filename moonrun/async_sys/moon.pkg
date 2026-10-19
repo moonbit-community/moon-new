@@ -1,0 +1,19 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/pipe",
+  "moonbitlang/async/socket",
+  "moonbitlang/async/types",
+  "moonbitlang/core/encoding/utf16",
+  "moonbitlang/core/encoding/utf8",
+}
+
+options(
+  supported_targets: "native",
+  "native-stub": [
+    "event_bus.c",
+    "native_jobs.c",
+    "socket_io.c",
+    "process.c",
+    "watchers.c",
+  ],
+)

@@ -1,0 +1,31 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moonrun/async_sys/jobs"
+
+import {
+  "moonbit-community/moonrun/resource",
+}
+
+// Values
+pub async fn packed_stat(Int32, Int32, Int32) -> Bytes
+
+pub async fn run_native_job(NativeJobKind, String, Int32, Int32, Int32, Bool) -> @resource.JobResult
+
+pub fn stat_length(Int32, Int32) -> Int32 raise
+
+// Errors
+
+// Types and methods
+pub(all) enum NativeJobKind {
+  StatPath
+  ReadDirectory
+  StatFd
+  ResolveHost
+  AddWatch
+  OpenWatcher
+  ReadWatchEvents
+  ReadPolicy
+}
+
+// Type aliases
+
+// Traits

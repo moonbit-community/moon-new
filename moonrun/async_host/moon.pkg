@@ -1,0 +1,17 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/core/cmp",
+  "moonbitlang/async/cond_var",
+  "moonbit-community/moonrun/runtime/handles",
+  "moonbitlang/async/os_error",
+  "moonbit-community/moonrun/process",
+  "moonbit-community/moonrun/resource",
+  "moonbit-community/moonrun/runtime/stdio",
+  "moonbit-community/moonrun/async_sys" @sys,
+  "moonbit-community/moonrun/run_termination" @termination,
+  "moonbitlang/async/types",
+}
+
+options(
+  supported_targets: "native",
+)

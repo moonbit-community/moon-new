@@ -1,0 +1,104 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moonrun/async_host"
+
+import {
+  "moonbit-community/moonrun/async_sys",
+  "moonbit-community/moonrun/process",
+  "moonbit-community/moonrun/resource",
+  "moonbit-community/moonrun/run_termination",
+  "moonbit-community/moonrun/runtime/handles",
+  "moonbit-community/moonrun/runtime/stdio",
+  "moonbitlang/async",
+  "moonbitlang/async/cond_var",
+  "moonbitlang/async/os_error",
+  "moonbitlang/core/set",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) struct AddrInfo {
+  address : Bytes
+  next : Int64
+}
+
+pub(all) struct AsyncHost {
+  handles : @handles.Handles
+  stdio : @stdio.Stdio
+  group : @async.TaskGroup[@run_termination.RunOutcome]
+  buffers : Map[Int64, FixedArray[Byte]]
+  buses : Map[Int64, @async_sys.EventBus]
+  fds : Map[Int64, @resource.Resource]
+  stdio_handles : Map[Int32, Int64]
+  jobs : Map[Int64, Job]
+  workers : Map[Int64, Worker]
+  io_results : Map[Int64, @resource.IoResult]
+  address_info : Map[Int64, AddrInfo]
+  accepting : @set.Set[Int64]
+  mut pool : ThreadPool?
+  mut shutting_down : Bool
+  signals : @set.Set[Int32]
+  signal_waiters : Map[Int64, SignalWaiter]
+  mut signal_enabled : Bool
+  mut termination_signal : Int32?
+  mut current_bus : Int64?
+  mut async_errno : Int32
+}
+pub fn AsyncHost::AsyncHost(@handles.Handles, @stdio.Stdio, @async.TaskGroup[@run_termination.RunOutcome]) -> Self
+pub fn AsyncHost::addrinfo_result(Self, Int64) -> Int64 raise @async_sys.HostError
+pub fn AsyncHost::close(Self) -> Unit
+pub fn AsyncHost::deliver_signal(Self, Int32) -> Bool raise @async_sys.HostError
+pub fn AsyncHost::destroy_thread_pool(Self) -> Unit
+pub fn AsyncHost::initialize_thread_pool(Self, Int64) -> Int64 raise @async_sys.HostError
+pub fn AsyncHost::new_job(Self, async () -> @resource.JobResult, cleanup? : () -> Unit) -> Int64
+pub fn AsyncHost::new_spawn_job(Self, @process.HostProcess, @process.SpawnOptions) -> Int64
+pub fn AsyncHost::open_job_fd(Self, Int64) -> Int64 raise @async_sys.HostError
+pub fn AsyncHost::spawn_job_result(Self, @process.HostProcess, Int64) -> Int64 raise @os_error.OSError
+pub fn AsyncHost::spawn_worker(Self, Int32, Job, @resource.Resource?) -> Int64 raise @async_sys.HostError
+pub fn AsyncHost::start_io(Self, @resource.IoResult, Int64, Int64, async (@resource.Resource) -> @resource.JobResult) -> Int32 raise
+pub fn AsyncHost::start_worker(Self, Worker, Int32, Job) -> Unit raise @async_sys.HostError
+
+pub struct Job {
+  mut result : @resource.JobResult?
+  mut running : Bool
+  spawn : @process.SpawnOptions?
+  // private fields
+}
+pub fn Job::dispose(Self) -> Unit
+pub async fn Job::run_inline(Self) -> Unit
+
+pub(all) enum PublishedResult {
+  OpenedFile(Int64)
+  ResolvedAddresses(Int64)
+  SpawnedProcess(Int64)
+}
+
+pub(all) struct SignalWaiter {
+  interests : @set.Set[Int32]
+  ready : @cond_var.Cond
+  mut signal : Int32?
+}
+
+pub struct ThreadPool {
+  bus : @async_sys.EventBus
+  source : Int64
+  read : Int32
+  write : Int32
+  mut closed : Bool
+  // private fields
+}
+pub fn ThreadPool::close(Self) -> Unit
+pub fn ThreadPool::fetch_completion(Self, Int32) -> Array[Int32] raise @async_sys.HostError
+pub fn ThreadPool::notify(Self, Int32) -> Unit raise @async_sys.HostError
+
+pub struct Worker {
+  mut task : @async.Task[Unit]?
+  mut done : Bool
+  completion : @resource.Resource?
+}
+
+// Type aliases
+
+// Traits

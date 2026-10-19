@@ -1,0 +1,9 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/x/path",
+  "moonbitlang/x/path/win32" @winpath,
+}
+
+options(
+  supported_targets: "native",
+)

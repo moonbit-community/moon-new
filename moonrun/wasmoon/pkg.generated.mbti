@@ -1,0 +1,25 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moonrun/wasmoon"
+
+import {
+  "Milky2018/wasm_core/types",
+  "Milky2018/wasmoon/runtime",
+  "moonbit-community/moonrun/run_termination",
+  "moonbit-community/moonrun/runtime/state",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct Context {
+  // private fields
+}
+pub fn Context::Context(@state.Runtime) -> Self
+pub fn Context::close(Self) -> Unit
+pub async fn Context::execute(Self, @runtime.Linker, @types.Module, Array[(String, Array[(UInt32, UInt32)])]?) -> @run_termination.RunOutcome
+
+// Type aliases
+
+// Traits

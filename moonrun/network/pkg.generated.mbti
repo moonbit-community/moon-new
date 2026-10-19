@@ -1,0 +1,28 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moonrun/network"
+
+import {
+  "moonbit-community/moonrun/policy",
+  "moonbit-community/moonrun/resource",
+  "moonbit-community/moonrun/runtime/stdio",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct HostNetwork {
+  // private fields
+}
+pub fn HostNetwork::HostNetwork(@policy.Policy?, @stdio.Stdio) -> Self
+pub async fn HostNetwork::bind(Self, @resource.Resource, Bytes) -> Unit
+pub async fn HostNetwork::bind_job(Self, @resource.Resource, Bytes) -> @resource.JobResult
+pub async fn HostNetwork::connect(Self, @resource.Resource, Bytes) -> Unit
+pub async fn HostNetwork::perform_socket_io(Self, @resource.IoResult, @resource.Resource) -> @resource.JobResult
+pub async fn HostNetwork::resolve_hostname(Self, String) -> @resource.JobResult
+pub async fn HostNetwork::send_to(Self, @resource.Resource, Bytes, Bytes) -> Int32
+
+// Type aliases
+
+// Traits

@@ -2,12 +2,12 @@
 async test "ambient guest can query and signal a process created outside its run" {
   let windows = @async.platform is Windows
   let pid = if windows {
-    @process.spawn_orphan("cmd", ["/d", "/c", "ping -n 6 127.0.0.1 >nul"])
+    @native_process.spawn_orphan("cmd", ["/d", "/c", "ping -n 6 127.0.0.1 >nul"])
   } else {
-    @process.spawn_orphan("/bin/sh", ["-c", "exec sleep 5"])
+    @native_process.spawn_orphan("/bin/sh", ["-c", "exec sleep 5"])
   }
   let mut reaped = false
-  defer (if !reaped { ignore(@process.wait_pid(pid)) })
+  defer (if !reaped { ignore(@native_process.wait_pid(pid)) })
   let source =
     #|(module
     #| (import "moonbitlang/async" "process/open_pid_handle" (func $open (param i32) (result i64)))
@@ -113,4 +113,16 @@ async test "legacy spawn merges overrides and ignores initialized invalid enviro
     #|   end
     #|   i32.const 256 i32.load i32.const 23 i32.ne if unreachable end))
   assert_eq(@async.with_timeout(3000, () => compile(source).run()), Completed)
+}
+
+///|
+async test "current and legacy spawn result handle imports return null before publication" {
+  let source =
+    #|(module
+    #| (import "moonbitlang/async" "thread_pool/spawn_job_get_result_handle" (func $current (param i64) (result i64)))
+    #| (import "moonbitlang/async" "thread_pool/get_spawn_job_result_handle" (func $legacy (param i64 i32) (result i64)))
+    #| (func (export "_start")
+    #|   i64.const 0 call $current i64.eqz i32.eqz if unreachable end
+    #|   i64.const 0 i32.const 0 call $legacy i64.eqz i32.eqz if unreachable end))
+  assert_eq(compile(source).run(), Completed)
 }

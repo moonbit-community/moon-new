@@ -1,0 +1,8 @@
+import {
+  "moonbitlang/async",
+  "moonbit-community/moonrun/async_sys" @sys,
+}
+
+options(
+  supported_targets: "native",
+)

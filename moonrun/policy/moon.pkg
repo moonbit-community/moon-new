@@ -1,0 +1,21 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/core/env",
+  "moonbit-community/moonrun/runtime/environment",
+  "moonbitlang/async/fs",
+  "moonbitlang/core/json",
+  "moonbit-community/moonrun/async_sys/jobs" @native_jobs,
+  "moonbitlang/async/os_error",
+  "moonbitlang/x/path",
+  "moonbitlang/async/socket",
+  "moonbitlang/core/string",
+  "moonbit-community/moonrun/async_sys" @sys,
+  "moonbit-community/toml",
+  "moonbitlang/core/encoding/utf8",
+  "moonbit-community/moonrun/runtime/working_directory",
+  "moonbit-community/yaml",
+}
+
+options(
+  supported_targets: "native",
+)
