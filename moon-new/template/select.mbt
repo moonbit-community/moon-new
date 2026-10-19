@@ -17,7 +17,7 @@ pub extend TemplateError with Show::{output, to_string}
 /// whether its contents should be rendered. Paths and link targets always render.
 fn select(
   entries : Array[@repository.Entry],
-  warnings? : Array[String] = [],
+  warnings~ : Array[String] = [],
 ) -> Array[(@repository.Entry, Bool)] raise {
   let mut fields : Map[String, Json] = Map([])
   for entry in entries {

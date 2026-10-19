@@ -71,7 +71,7 @@ async test "sandbox cleanup removes read-only files without following directory 
 
 ///|
 struct Output {
-  status : Int
+  status : Int32
   stdout : String
   stderr : String
 } derive(Debug)
@@ -106,16 +106,22 @@ async fn checked(
 
 ///|
 async fn cli_command() -> (String, Array[String]) {
+  // Ask Moon for the artifact path: workspace layouts depend on member count.
+  let output = checked(
+    "moon",
+    ["run", ".", "--target", "wasm", "--build-only"],
+    cwd=root(),
+  )
+  guard @json.parse(output) is { "artifacts_path": [String(artifact)], .. } else {
+    fail("expected exactly one CLI artifact")
+  }
   // Resolve the runner before tests clear the child PATH to hide Git.
   let executable = if windows() { "moonrun.exe" } else { "moonrun" }
   let separator = if windows() { ";" } else { ":" }
   for directory in @env.get_env_var("PATH").unwrap_or("").split(separator) {
     let path = directory.to_owned() + "/" + executable
     if @fs.exists(path) {
-      return (
-        @fs.realpath(path),
-        [root() + "/_build/wasm/debug/build/moon-new.wasm", "--"],
-      )
+      return (@fs.realpath(path), [artifact, "--"])
     }
   }
   fail("moonrun not found on PATH")
@@ -138,7 +144,7 @@ async fn Sandbox::exists(self : Sandbox, path : String) -> Bool {
 }
 
 ///|
-async fn files(directory : String, prefix? : String = "") -> Array[String] {
+async fn files(directory : String, prefix~ : String = "") -> Array[String] {
   let result = []
   for name in @fs.readdir(directory, include_hidden=true) {
     if name == ".git" {

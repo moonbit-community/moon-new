@@ -58,9 +58,9 @@ fn parse_rule(pattern : String) -> Rule? raise TemplateError {
 ///|
 fn parse_glob(
   chars : Array[Char],
-  start : Int,
+  start : Int32,
   group : Bool,
-) -> (Array[Glob], Int) raise TemplateError {
+) -> (Array[Glob], Int32) raise TemplateError {
   let tokens = []
   let mut i = start
   while i < chars.length() {
@@ -132,8 +132,8 @@ fn parse_glob(
 ///|
 fn parse_class(
   chars : Array[Char],
-  start : Int,
-) -> (Glob, Int) raise TemplateError {
+  start : Int32,
+) -> (Glob, Int32) raise TemplateError {
   let negated = chars.get(start + 1) is Some('!' | '^')
   let first = start + (if negated { 2 } else { 1 })
   let mut end = first
@@ -196,10 +196,14 @@ fn parse_class(
 ///|
 // Track all reachable positions instead of backtracking through wildcard
 // combinations. Nested alternatives never expand into a product of patterns.
-fn consume(tokens : Array[Glob], text : Bytes, initial : Set[Int]) -> Set[Int] {
+fn consume(
+  tokens : Array[Glob],
+  text : Bytes,
+  initial : Set[Int32],
+) -> Set[Int32] {
   let mut positions = initial
   for token in tokens {
-    let next : Set[Int] = Set([])
+    let next : Set[Int32] = Set([])
     for pos in positions {
       match token {
         Literal(bytes) =>

@@ -12,8 +12,10 @@ You can browse and install extra skills here:
   blackbox test files (ending in `_test.mbt`) and whitebox test files (ending in
   `_wbtest.mbt`).
 
-- In the toplevel directory, there is a `moon.mod` file listing module
-  metadata.
+- The repository root contains `moon.work`. Each member directory contains a
+  `moon.mod` file listing its module metadata. Run workspace checks from the
+  repository root; select a member for packaging or publishing, for example
+  `moon -C moon-new package`.
 
 ## Coding convention
 

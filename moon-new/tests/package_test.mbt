@@ -18,6 +18,14 @@ async test "package assets regenerate, build, and create a runnable project" {
   } else {
     ignore(checked("unzip", ["-q", archive, "-d", source], cwd=repository))
   }
+  for name in ["moon.mod", "README.mbt.md", "LICENSE"] {
+    assert_eq(
+      @fs.read_file(source + "/" + name).binary(),
+      @fs.read_file(repository + "/" + name).binary(),
+      msg=name,
+    )
+  }
+  assert_false(@fs.exists(source + "/moon.work"))
   // The bundled starter's source assets must survive packaging independently
   // of how dev_build rules are written in moon.pkg.
   let inputs = [

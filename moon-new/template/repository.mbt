@@ -4,7 +4,7 @@ pub fn render_repository(
   entries : Array[@repository.Entry],
   username : String,
   name : String,
-  warnings? : Array[String] = [],
+  warnings~ : Array[String] = [],
 ) -> Array[Entry] raise {
   let context = @liquid.LiquidContext::new()
   context.set("username", @liquid.string_value(username))

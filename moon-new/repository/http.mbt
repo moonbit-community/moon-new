@@ -29,7 +29,7 @@ fn remote_url(source : String) -> String? raise @object.GitError {
       part != ".." &&
       part
       .iter()
-      .all(c => c is ('A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.'))
+      .all(c => c is ('A'..<='Z' | 'a'..<='z' | '0'..<='9' | '-' | '_' | '.'))
     }) {
     return Some("https://github.com/" + source)
   }

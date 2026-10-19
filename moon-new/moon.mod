@@ -22,4 +22,6 @@ import {
   "mizchi/bit_types@0.48.0",
   "mizchi/bit_lib@0.48.0",
   "moonbit-community/liquid@0.2.0",
+  // bit_pack requires 0.1.2, whose JSON manifests are unsupported by the toolchain.
+  "mizchi/tempfile@0.1.3",
 }

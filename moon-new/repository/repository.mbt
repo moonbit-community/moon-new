@@ -14,7 +14,7 @@ pub async fn load(
   branch? : String,
   tag? : String,
   rev? : String,
-  subdir? : String = "",
+  subdir~ : String = "",
 ) -> Array[Entry] {
   let requested = match (branch, tag, rev) {
     (None, None, None) => "HEAD"
