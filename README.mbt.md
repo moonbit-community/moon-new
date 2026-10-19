@@ -5,6 +5,7 @@ MoonBit implementations of tools currently written in Rust. Each tool is an inde
 ## Modules
 
 - [moon-new](moon-new/README.mbt.md): create a MoonBit project from the bundled hello starter or a Git repository.
+- [moonrun](moonrun/README.mbt.md): a native Wasmoon-based runner and embedding library, currently under development.
 
 ## Development
 

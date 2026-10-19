@@ -1,0 +1,9 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/process",
+  "moonbitlang/async/os_error",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "-all+wasm"

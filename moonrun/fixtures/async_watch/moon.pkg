@@ -1,0 +1,8 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "-all+wasm"

@@ -45,3 +45,6 @@ jobs:
           moon info
           moon fmt
           git diff --exit-code
+      - name: Test moonrun against compiled fixtures
+        shell: bash
+        run: bash scripts/test-moonrun.sh

@@ -1,0 +1,159 @@
+///|
+#borrow(group, local_address)
+extern "C" fn join_multicast(
+  fd : @types.Fd,
+  group : Bytes,
+  local_address : Bytes,
+) -> Int32 = "moonbitlang_async_join_multicast_group"
+
+///|
+#borrow(group)
+extern "C" fn join_multicast_v6(
+  fd : @types.Fd,
+  group : Bytes,
+  interface : UInt32,
+) -> Int32 = "moonbitlang_async_join_multicast_group_v6"
+
+///|
+#borrow(address)
+extern "C" fn set_multicast_interface(fd : @types.Fd, address : Bytes) -> Int32 = "moonbitlang_async_set_multicast_interface"
+
+///|
+extern "C" fn set_multicast_interface_v6(
+  fd : @types.Fd,
+  interface : UInt32,
+) -> Int32 = "moonbitlang_async_set_multicast_interface_v6"
+
+///|
+extern "C" fn set_multicast_ttl(
+  fd : @types.Fd,
+  ttl : Int32,
+  family : Int32,
+) -> Int32 = "moonbitlang_async_set_multicast_ttl"
+
+///|
+extern "C" fn set_multicast_loopback(
+  fd : @types.Fd,
+  enabled : Bool,
+  family : Int32,
+) -> Int32 = "moonbitlang_async_set_multicast_loopback"
+
+///|
+#borrow(name)
+extern "C" fn interface_index(fd : @types.Fd, name : Bytes) -> UInt32 = "moonbitlang_async_if_nametoindex"
+
+///|
+extern "C" fn interface_name(fd : @types.Fd, index : UInt32) -> Bytes = "moonrun_interface_name"
+
+///|
+extern "C" fn find_ipv6_interface() -> UInt32 = "moonbitlang_async_find_ipv6_test_interface"
+
+///|
+fn socket_option_signature(name : String) -> @wasm.FuncType? {
+  let (params, results) : (
+    ReadOnlyArray[@wasm.ValueType],
+    ReadOnlyArray[@wasm.ValueType],
+  ) = match name {
+    "socket/join_multicast_group" => ([I64, I32, I32, I32, I32], [I32])
+    "socket/join_multicast_group_v6" => ([I64, I32, I32, I32], [I32])
+    "socket/set_multicast_interface"
+    | "socket/set_multicast_ttl"
+    | "socket/set_multicast_loopback" => ([I64, I32, I32], [I32])
+    "socket/set_multicast_interface_v6" => ([I64, I32], [I32])
+    "socket/if_nametoindex" => ([I32, I32], [I32])
+    "socket/if_indextoname" => ([I32], [I64])
+    "socket/find_ipv6_test_interface" => ([], [I32])
+    _ => return None
+  }
+  Some({ params, results, })
+}
+
+///|
+fn Host::socket_option_import(
+  self : Host,
+  caller : @vm.Caller,
+  name : String,
+  args : Array[@wasm.Value],
+) -> Array[@wasm.Value] raise @vm.RuntimeError {
+  if name == "socket/find_ipv6_test_interface" {
+    return [I32(find_ipv6_interface().reinterpret_as_int())]
+  }
+  if name == "socket/if_nametoindex" || name == "socket/if_indextoname" {
+    let text = if name == "socket/if_nametoindex" {
+      guest_string(caller, i32(args[0]), i32(args[1]))
+    } else {
+      ""
+    }
+    if text.contains_char('\u0000') {
+      self.async_errno = if @async.platform is Windows { 87 } else { 22 }
+      return [I32(0)]
+    }
+    let fd = make_udp_socket(4, false)
+    if socket_invalid(fd) {
+      self.async_errno = @os_error.get_errno()
+      return if name == "socket/if_nametoindex" { [I32(0)] } else { [I64(0L)] }
+    }
+    defer close_socket(fd)
+    if name == "socket/if_nametoindex" {
+      let text = if @async.platform is Windows {
+        @utf16.encode(text, endianness=Little, bom=false) + b"\x00\x00"
+      } else {
+        // Match OsString: Bytes have a trailing NUL outside their length.
+        @utf8.encode(text)
+      }
+      let index = interface_index(fd, text)
+      if index == 0U {
+        self.async_errno = @os_error.get_errno()
+      }
+      [I32(index.reinterpret_as_int())]
+    } else {
+      let data = interface_name(fd, i32(args[0]).reinterpret_as_uint())
+      if data.is_empty() {
+        self.async_errno = @os_error.get_errno()
+        return [I64(0L)]
+      }
+      let handle = self.next_handle
+      self.next_handle += 1L
+      self.buffers[handle] = data.to_fixedarray()
+      [I64(handle)]
+    }
+  } else {
+    guard self.socket(args[0]) is Some(fd) else { return [I32(-1)] }
+    let result = match name {
+      "socket/set_multicast_interface_v6" =>
+        set_multicast_interface_v6(
+          fd.native(),
+          i32(args[1]).reinterpret_as_uint(),
+        )
+      "socket/set_multicast_ttl" =>
+        set_multicast_ttl(fd.native(), i32(args[1]), i32(args[2]))
+      "socket/set_multicast_loopback" =>
+        set_multicast_loopback(fd.native(), i32(args[1]) != 0, i32(args[2]))
+      "socket/join_multicast_group" => {
+        let group = guest_bytes(caller, i32(args[1]), i32(args[3]))
+        let local_address = guest_bytes(caller, i32(args[2]), i32(args[4]))
+        guard !decode_address(group).is_ipv6() &&
+          !decode_address(local_address).is_ipv6() else {
+          raise @vm.TypeMismatch
+        }
+        join_multicast(fd.native(), group, local_address)
+      }
+      "socket/join_multicast_group_v6" => {
+        let group = guest_bytes(caller, i32(args[1]), i32(args[3]))
+        guard decode_address(group).is_ipv6() else { raise @vm.TypeMismatch }
+        join_multicast_v6(
+          fd.native(),
+          group,
+          i32(args[2]).reinterpret_as_uint(),
+        )
+      }
+      "socket/set_multicast_interface" => {
+        let address = guest_bytes(caller, i32(args[1]), i32(args[2]))
+        guard !decode_address(address).is_ipv6() else { raise @vm.TypeMismatch }
+        set_multicast_interface(fd.native(), address)
+      }
+      _ => raise @vm.UnknownImport("moonbitlang/async", name)
+    }
+    self.socket_status(result)
+  }
+}

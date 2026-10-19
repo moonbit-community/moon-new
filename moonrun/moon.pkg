@@ -1,0 +1,18 @@
+import {
+  "moonbit-community/moonrun/runtime",
+  "moonbitlang/async",
+  "moonbitlang/async/stdio",
+  "moonbitlang/async/signal",
+  "moonbitlang/async/pipe",
+  "moonbitlang/async/types",
+  "moonbitlang/x/sys",
+  "moonbitlang/core/env",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"
+
+options(
+  "native-stub": [ "cli_signals.c" ],
+)

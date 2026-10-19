@@ -1,0 +1,46 @@
+import {
+  "Milky2018/wasm_core/types" @wasm,
+  "Milky2018/wasm_core/parser",
+  "Milky2018/wasm_core/validator",
+  "Milky2018/wasmoon/runtime" @vm,
+  "Milky2018/wasmoon/executor",
+  "Milky2018/wasmoon/wasi",
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/stdio",
+  "moonbitlang/async/os_error",
+  "moonbitlang/async/pipe",
+  "moonbitlang/async/raw_fd",
+  "moonbitlang/async/types",
+  "moonbitlang/async/signal",
+  "moonbitlang/async/cond_var",
+  "moonbitlang/async/socket",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/encoding/utf16",
+  "moonbitlang/core/json",
+  "moonbitlang/core/env",
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/string",
+  "moonbit-community/toml",
+  "moonbit-community/yaml",
+  "moonbitlang/x/path",
+  "moonbitlang/x/path/win32" @winpath,
+}
+
+import {
+  "Milky2018/wasm_core/wat",
+  "Milky2018/wasm_core/encoder",
+  "moonbitlang/async/signal",
+  "moonbitlang/async/process",
+} for "test"
+
+options(
+  supported_targets: "native",
+  "native-stub": [
+    "event_bus.c",
+    "native_jobs.c",
+    "socket_io.c",
+    "process.c",
+    "watchers.c",
+  ],
+)
