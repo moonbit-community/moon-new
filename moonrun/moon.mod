@@ -19,7 +19,7 @@ import {
   "Milky2018/wasm_core@0.17.0",
   "moonbitlang/async@0.22.4",
   "moonbitlang/x@0.5.5",
-  "moonbit-community/sqlite3@0.2.3",
+  "moonbit-community/moonrun-sqlite3@0.1.0",
   "moonbit-community/toml@0.5.0",
   "moonbit-community/yaml@0.0.8",
 }

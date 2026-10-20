@@ -1,11 +1,13 @@
 ///|
 pub struct Handles {
+  invalid_fd : Int64
+  null_handle : Int64
   priv mut next : Int64
 }
 
 ///|
 pub fn Handles::Handles() -> Handles {
-  { next: 1L, }
+  { invalid_fd: 1L, null_handle: 2L, next: 3L, }
 }
 
 ///|

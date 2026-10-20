@@ -161,7 +161,7 @@ fn Context::legacy_async_import(
       let base = if kind { 1 } else { 0 }
       let path = guest_string(caller, i32(args[base]), i32(args[base + 1]))
       let follow = i32(args[base + 2]) != 0
-      let parent = if kind && i64(args[0]) != 0L {
+      let parent = if kind && i64(args[0]) != self.runtime.handles.invalid_fd {
         guard host.fds.get(i64(args[0])) is Some(fd) else {
           raise @vm.TypeMismatch
         }

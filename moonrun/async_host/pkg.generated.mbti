@@ -8,6 +8,7 @@ import {
   "moonbit-community/moonrun/run_termination",
   "moonbit-community/moonrun/runtime/handles",
   "moonbit-community/moonrun/runtime/stdio",
+  "moonbit-community/moonrun/sqlite",
   "moonbitlang/async",
   "moonbitlang/async/cond_var",
   "moonbitlang/async/os_error",
@@ -52,9 +53,10 @@ pub fn AsyncHost::close(Self) -> Unit
 pub fn AsyncHost::deliver_signal(Self, Int32) -> Bool raise @async_sys.HostError
 pub fn AsyncHost::destroy_thread_pool(Self) -> Unit
 pub fn AsyncHost::initialize_thread_pool(Self, Int64) -> Int64 raise @async_sys.HostError
-pub fn AsyncHost::new_job(Self, async () -> @resource.JobResult, cleanup? : () -> Unit) -> Int64
+pub fn AsyncHost::new_job(Self, async () -> @resource.JobResult, cleanup? : () -> Unit, sqlite? : @sqlite.Job) -> Int64
 pub fn AsyncHost::new_spawn_job(Self, @process.HostProcess, @process.SpawnOptions) -> Int64
 pub fn AsyncHost::open_job_fd(Self, Int64) -> Int64 raise @async_sys.HostError
+pub fn AsyncHost::realpath_result(Self, Int64) -> Int64 raise @async_sys.HostError
 pub fn AsyncHost::spawn_job_result(Self, @process.HostProcess, Int64) -> Int64 raise @os_error.OSError
 pub fn AsyncHost::spawn_worker(Self, Int32, Job, @resource.Resource?) -> Int64 raise @async_sys.HostError
 pub fn AsyncHost::start_io(Self, @resource.IoResult, Int64, Int64, async (@resource.Resource) -> @resource.JobResult) -> Int32 raise
@@ -64,6 +66,7 @@ pub struct Job {
   mut result : @resource.JobResult?
   mut running : Bool
   spawn : @process.SpawnOptions?
+  sqlite : @sqlite.Job?
   // private fields
 }
 pub fn Job::dispose(Self) -> Unit
@@ -73,6 +76,7 @@ pub(all) enum PublishedResult {
   OpenedFile(Int64)
   ResolvedAddresses(Int64)
   SpawnedProcess(Int64)
+  BorrowedBuffer(Int64)
 }
 
 pub(all) struct SignalWaiter {
@@ -97,7 +101,11 @@ pub struct Worker {
   mut task : @async.Task[Unit]?
   mut done : Bool
   completion : @resource.Resource?
+  mut detached : Bool
+  // private fields
 }
+pub fn Worker::close(Self) -> Unit
+pub fn Worker::detach(Self) -> Unit
 
 // Type aliases
 

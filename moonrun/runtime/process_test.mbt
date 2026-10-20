@@ -11,6 +11,7 @@ async test "ambient guest can query and signal a process created outside its run
   let source =
     #|(module
     #| (import "moonbitlang/async" "process/open_pid_handle" (func $open (param i32) (result i64)))
+    #| (import "moonbitlang/async" "fd_util/invalid_fd" (func $invalid (result i64)))
     #| (import "moonbitlang/async" "process/get_process_result" (func $result (param i64 i32 i32) (result i32)))
     #| (import "moonbitlang/async" "process/kill" (func $kill (param i32)))
     #| (import "moonbitlang/async" "os_error/get_errno" (func $errno (result i32)))
@@ -28,7 +29,7 @@ async test "ambient guest can query and signal a process created outside its run
     #|     if i32.const 1 call $sleep call $run br $wait end
     #|   end
     #|   i32.const 0 i32.load i32.const STATUS i32.ne if unreachable end
-    #|   local.get $handle i64.eqz if else local.get $handle call $close if unreachable end end))
+    #|   local.get $handle call $invalid i64.ne if local.get $handle call $close if unreachable end end))
   let program = compile(
     source
     .split("PID")
@@ -54,9 +55,10 @@ async test "policy denies opening a process not created by the guest" {
   let source =
     #|(module
     #| (import "moonbitlang/async" "process/open_pid_handle" (func $open (param i32) (result i64)))
+    #| (import "moonbitlang/async" "fd_util/invalid_fd" (func $invalid (result i64)))
     #| (import "moonbitlang/async" "os_error/get_errno" (func $errno (result i32)))
     #| (func (export "_start")
-    #|   i32.const 1 call $open i64.eqz i32.eqz if unreachable end
+    #|   i32.const 1 call $open call $invalid i64.ne if unreachable end
     #|   call $errno i32.const PERMISSION i32.ne if unreachable end))
   let policy = @runtime.Policy::from_json("{}")
   assert_eq(
@@ -78,6 +80,7 @@ async test "legacy spawn merges overrides and ignores initialized invalid enviro
   let source =
     #|(module
     #| (import "moonbitlang/async" "process/allocate_env_block" (func $env (param i32) (result i64)))
+    #| (import "moonbitlang/async" "fd_util/invalid_fd" (func $invalid (result i64)))
     #| (import "moonbitlang/async" "process/env_block_add_entry" (func $entry (param i64 i32 i32 i32 i32 i32)))
     #| (import "moonbitlang/async" "process/make_argv_array/unix" (func $argv (param i32) (result i64)))
     #| (import "moonbitlang/async" "process/argv_array_add_entry/unix" (func $arg (param i64 i32 i32 i32)))
@@ -105,10 +108,10 @@ async test "legacy spawn merges overrides and ignores initialized invalid enviro
     #|   local.get $argv i32.const 1 i32.const 64 i32.const 2 call $arg
     #|   local.get $argv i32.const 2 i32.const 96 i32.const 9 call $arg
     #|   i32.const 0 i32.const 7 local.get $argv local.get $env i32.const 1
-    #|   i64.const 0 i64.const 0 i64.const 0 i32.const 0 i32.const 0 i32.const 0 call $spawn
+    #|   call $invalid call $invalid call $invalid i32.const 0 i32.const 0 i32.const 0 call $spawn
     #|   local.tee $job call $run local.get $job call $ret local.set $pid
     #|   loop $wait
-    #|     i64.const 0 local.get $pid i32.const 256 call $result
+    #|     call $invalid local.get $pid i32.const 256 call $result
     #|     if i32.const 1 call $sleep call $run br $wait end
     #|   end
     #|   i32.const 256 i32.load i32.const 23 i32.ne if unreachable end))
@@ -119,10 +122,84 @@ async test "legacy spawn merges overrides and ignores initialized invalid enviro
 async test "current and legacy spawn result handle imports return null before publication" {
   let source =
     #|(module
+    #| (import "moonbitlang/sqlite" "sqlite3_null_handle" (func $null (result i64)))
     #| (import "moonbitlang/async" "thread_pool/spawn_job_get_result_handle" (func $current (param i64) (result i64)))
     #| (import "moonbitlang/async" "thread_pool/get_spawn_job_result_handle" (func $legacy (param i64 i32) (result i64)))
     #| (func (export "_start")
-    #|   i64.const 0 call $current i64.eqz i32.eqz if unreachable end
-    #|   i64.const 0 i32.const 0 call $legacy i64.eqz i32.eqz if unreachable end))
+    #|   i64.const 0 call $current call $null i64.ne if unreachable end
+    #|   i64.const 0 i32.const 0 call $legacy call $null i64.ne if unreachable end))
   assert_eq(compile(source).run(), Completed)
+}
+
+///|
+async test "macOS PID fallback clears stale errno" {
+  if !(@async.platform is MacOS) {
+    return
+  }
+  let source =
+    #|(module
+    #| (import "moonbitlang/async" "process/get_process_result" (func $result (param i64 i32 i32) (result i32)))
+    #| (import "moonbitlang/async" "process/open_pid_handle" (func $open (param i32) (result i64)))
+    #| (import "moonbitlang/async" "fd_util/invalid_fd" (func $invalid (result i64)))
+    #| (import "moonbitlang/async" "os_error/get_errno" (func $errno (result i32)))
+    #| (memory (export "memory") 1)
+    #| (func (export "_start")
+    #|   i64.const 0 i32.const 1 i32.const 0 call $result i32.const -1 i32.ne if unreachable end
+    #|   call $errno i32.const 9 i32.ne if unreachable end
+    #|   i32.const 1 call $open call $invalid i64.ne if unreachable end
+    #|   call $errno if unreachable end))
+  assert_eq(compile(source).run(), Completed)
+}
+// Compatibility regressions; original probes from moon/crates/moonrun/tests at 12e9d22e.
+
+///|
+async test "process result distinguishes null and reserved invalid handles" {
+  if @async.platform is Windows {
+    return
+  }
+  let source =
+    #|(module
+    #|                    (import "moonbitlang/async" "process/get_process_result"
+    #|                        (func $result (param i64 i32 i32) (result i32)))
+    #|                    (import "moonbitlang/async" "fd_util/invalid_fd"
+    #|                        (func $invalid (result i64)))
+    #|                    (import "moonbitlang/async" "os_error/get_errno"
+    #|                        (func $errno (result i32)))
+    #|                    (memory (export "memory") 1)
+    #|                    (func (export "_start")
+    #|                        (if (i32.ne (call $result (i64.const 0) (i32.const 97841) (i32.const 0))
+    #|                                    (i32.const -1)) (then unreachable))
+    #|                        (if (i32.ne (call $errno) (i32.const 9)) (then unreachable))
+    #|                        (if (i32.ne (call $result (call $invalid) (i32.const 97841) (i32.const 0))
+    #|                                    (i32.const -1)) (then unreachable))
+    #|                        (if (i32.ne (call $errno) (i32.const 10)) (then unreachable))))
+  assert_eq(compile(source).run(), Completed)
+}
+
+///|
+async test "spawn rejects zero stdio instead of treating it as the invalid-fd sentinel" {
+  if @async.platform is Windows {
+    return
+  }
+  let source =
+    #|(module
+    #| (import "moonbitlang/async" "process/make_argv_array/unix" (func $argv (param i32) (result i64)))
+    #| (import "moonbitlang/async" "thread_pool/spawn_job/unix" (func $spawn (param i32 i32 i64 i64 i64 i64 i64) (result i64)))
+    #| (import "moonbitlang/async" "process/make_env" (func $env (param i32) (result i64)))
+    #| (import "moonbitlang/async" "fd_util/invalid_fd" (func $invalid (result i64)))
+    #| (memory (export "memory") 1)
+    #| (func (export "_start")
+    #|   i32.const 0 i32.const 0 i32.const 0 call $argv i32.const 0 call $env STDIO
+    #|   call $spawn drop))
+  for
+    handles in [
+      "i64.const 0 call $invalid call $invalid", "call $invalid i64.const 0 call $invalid",
+      "call $invalid call $invalid i64.const 0",
+    ] {
+    guard compile(source.replace(old="STDIO", new=handles)).run()
+      is Trapped(message) else {
+      fail("spawn accepted a null descriptor")
+    }
+    assert_true(message.contains("Badf"))
+  }
 }

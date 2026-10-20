@@ -47,6 +47,7 @@ async test "async buffer byte access and null-terminated length" {
   let program = compile(
     (
       #|(module
+      #| (import "moonbitlang/sqlite" "sqlite3_null_handle" (func $runtime_null (result i64)))
       #| (import "moonbitlang/async" "c_buffer/new" (func $new (param i32) (result i64)))
       #| (import "moonbitlang/async" "c_buffer/free" (func $free (param i64)))
       #| (import "moonbitlang/async" "c_buffer/blit_to_c" (func $copy (param i64 i32 i32 i32 i32)))
@@ -63,8 +64,8 @@ async test "async buffer byte access and null-terminated length" {
       #|   local.get $buffer call $strlen i32.const 1 i32.ne if unreachable end
       #|   local.get $buffer i32.const 2 call $get i32.const 66 i32.ne if unreachable end
       #|   local.get $buffer call $null if unreachable end
-      #|   i64.const 0 call $null i32.eqz if unreachable end
-      #|   i64.const 0 call $free
+      #|   call $runtime_null call $null i32.eqz if unreachable end
+      #|   call $runtime_null call $free
       #|   local.get $buffer call $free))
     ),
   )
@@ -150,6 +151,7 @@ async test "socket syscalls return EFAULT for invalid guest buffers" {
     #| (import "moonbitlang/async" "socket/recvfrom/unix" (func $recv (param i64 i32 i32 i32 i32 i32) (result i32)))
     #| (import "moonbitlang/async" "socket/sendto/unix" (func $send (param i64 i32 i32 i32 i32 i32) (result i32)))
     #| (import "moonbitlang/async" "socket/accept/unix" (func $accept (param i64 i32 i32) (result i64)))
+    #| (import "moonbitlang/async" "fd_util/invalid_fd" (func $invalid (result i64)))
     #| (import "moonbitlang/async" "os_error/get_errno" (func $errno (result i32)))
     #| (memory (export "memory") 1)
     #| (func (export "_start") (local $fd i64)
@@ -158,7 +160,7 @@ async test "socket syscalls return EFAULT for invalid guest buffers" {
     #|   call $errno i32.const 14 i32.ne if unreachable end
     #|   local.get $fd i32.const 0 i32.const 0 i32.const 1 i32.const 65536 i32.const 16 call $send i32.const -1 i32.ne if unreachable end
     #|   call $errno i32.const 14 i32.ne if unreachable end
-    #|   i32.const 4 call $tcp i32.const 65536 i32.const 16 call $accept i64.eqz i32.eqz if unreachable end
+    #|   i32.const 4 call $tcp i32.const 65536 i32.const 16 call $accept call $invalid i64.ne if unreachable end
     #|   call $errno i32.const 14 i32.ne if unreachable end))
   assert_eq(compile(source).run(), Completed)
 }

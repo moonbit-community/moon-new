@@ -6,7 +6,8 @@ pub fn HostProcess::get_result(
   handle : Int64,
   pid : Int32,
 ) -> Int32 raise @os_error.OSError {
-  if handle == 0L && @async.platform is Windows {
+  if handle == 0L ||
+    (handle == self.handles.invalid_fd && @async.platform is Windows) {
     raise @os_error.OSError(@sys.bad_fd_errno, context="process handle")
   }
   let child = if self.policy is None &&
@@ -27,7 +28,7 @@ pub fn HostProcess::get_result(
     (self.process_handles.get(handle) is Some(External(_)) || child is None) {
     let fd = match self.process_handles.get(handle) {
       Some(External(process)) => process.fd
-      None if handle == 0L && !(@async.platform is Windows) =>
+      None if handle == self.handles.invalid_fd && !(@async.platform is Windows) =>
         @sys.invalid_native_fd()
       _ => raise @os_error.OSError(@sys.bad_fd_errno, context="process handle")
     }
@@ -47,7 +48,7 @@ pub fn HostProcess::get_result(
       context="process authority",
     )
   }
-  if handle != 0L &&
+  if handle != self.handles.invalid_fd &&
     !(self.process_handles.get(handle) is Some(Child(owner)) &&
     owner.identity == child.identity) {
     raise @os_error.OSError(@sys.bad_fd_errno, context="process provenance")

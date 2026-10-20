@@ -10,6 +10,7 @@ import {
   "moonbit-community/moonrun/run_termination",
   "moonbit-community/moonrun/runtime/handles",
   "moonbit-community/moonrun/runtime/stdio",
+  "moonbit-community/moonrun/sqlite",
   "moonbitlang/async",
 }
 
@@ -22,16 +23,19 @@ pub struct Runtime {
   args : Array[String]
   env : Map[String, String]
   cwd : String
+  executable : String?
   policy : @policy.Policy?
   handles : @handles.Handles
   stdio : @stdio.Stdio
   filesystem : @filesystem.HostFs
   network : @network.HostNetwork
   process : @process.HostProcess
+  sqlite : @sqlite.HostSqlite
   async_host : @async_host.AsyncHost
 }
-pub fn Runtime::Runtime(String, Array[String], Map[String, String], String, (() -> Bytes)?, ((Bytes) -> Unit)?, ((Bytes) -> Unit)?, @async.TaskGroup[@run_termination.RunOutcome], @policy.Policy?) -> Self
+pub fn Runtime::Runtime(String, Array[String], Map[String, String], String, (() -> Bytes)?, ((Bytes) -> Unit)?, ((Bytes) -> Unit)?, @async.TaskGroup[@run_termination.RunOutcome], @policy.Policy?, String?) -> Self
 pub fn Runtime::close(Self) -> Unit
+pub fn Runtime::leak_summary(Self) -> String?
 
 // Type aliases
 

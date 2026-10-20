@@ -12,7 +12,7 @@ fn Context::file_job_import(
       let request = i32(args[2])
       let capacity = i32(args[3])
       let parent_handle = i64(args[4])
-      let parent = if parent_handle == 0L {
+      let parent = if parent_handle == self.runtime.handles.invalid_fd {
         None
       } else {
         guard host.fds.get(parent_handle) is Some(parent) else {

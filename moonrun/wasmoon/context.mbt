@@ -9,6 +9,7 @@ pub struct Context {
   priv mut wasi_context : @wasi.WasiContext?
   priv mut ffi_memory : @vm.Memory?
   priv filesystem_results : @filesystem.OperationResults
+  priv sanitizer_objects : Map[UInt32, UInt32]
 }
 
 ///|
@@ -22,6 +23,7 @@ pub fn Context::Context(runtime : @state.Runtime) -> Context {
     wasi_context: None,
     ffi_memory: None,
     filesystem_results: @filesystem.OperationResults(),
+    sanitizer_objects: Map([]),
   }
 }
 

@@ -1,4 +1,5 @@
 members = [
   "./moon-new",
   "./moonrun",
+  "./moonrun-sqlite3",
 ]

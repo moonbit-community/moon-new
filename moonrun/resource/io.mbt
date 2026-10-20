@@ -34,7 +34,9 @@ pub async fn Resource::read_job(
         context="standard input adapter",
       )
     File(file) =>
-      if position == -1L {
+      if position == -1L && !(file.kind() is Regular) {
+        file.read(buffer)
+      } else if position == -1L {
         self.cursor_lock.acquire()
         defer self.cursor_lock.release()
         let count = file.read_at(buffer, position=self.cursor)
@@ -84,7 +86,9 @@ pub async fn Resource::write_job(
         context="standard output adapter",
       )
     File(file) =>
-      if position == -1L {
+      if position == -1L && !(file.kind() is Regular) {
+        file.write_once(data, offset=0, len=data.length())
+      } else if position == -1L {
         self.cursor_lock.acquire()
         defer self.cursor_lock.release()
         let count = if self.append {

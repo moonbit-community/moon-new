@@ -7,7 +7,7 @@ pub fn HostProcess::publish_child(
     raise @os_error.OSError(@sys.bad_fd_errno, context="closed child")
   }
   if @async.platform is MacOS {
-    return 0L
+    return self.handles.invalid_fd
   }
   let handle = self.handles.allocate()
   self.process_handles[handle] = ProcessHandle::Child(child)
@@ -32,6 +32,9 @@ pub fn HostProcess::open_pid_handle(
       },
       context="process authority",
     )
+  }
+  if @async.platform is MacOS {
+    return self.handles.invalid_fd
   }
   let native = @sys.open_native_process(pid)
   if !@sys.native_process_fd_valid(native) {

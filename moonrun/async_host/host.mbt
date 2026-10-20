@@ -68,9 +68,7 @@ pub fn AsyncHost::close(self : AsyncHost) -> Unit {
   }
   self.jobs.clear()
   for _, worker in self.workers {
-    if worker.completion is Some(fd) {
-      fd.release()
-    }
+    worker.close()
   }
   self.workers.clear()
   self.io_results.clear()

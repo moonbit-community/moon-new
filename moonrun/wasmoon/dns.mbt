@@ -36,9 +36,24 @@ fn Context::dns_import(
     }
     "thread_pool/get_getaddrinfo_result" =>
       [I64(self.runtime.async_host.addrinfo_result(i64(args[0])))]
-    "socket/addrinfo_is_null" => [I32(if i64(args[0]) == 0L { 1 } else { 0 })]
+    "socket/addrinfo_is_null" =>
+      [
+        I32(
+          if i64(args[0]) == self.runtime.handles.null_handle {
+            1
+          } else {
+            0
+          },
+        ),
+      ]
     "socket/addrinfo_free" => {
       let mut handle = i64(args[0])
+      if handle == self.runtime.handles.null_handle {
+        return []
+      }
+      guard self.runtime.async_host.address_info.contains(handle) else {
+        raise @sys.Operation("Badf")
+      }
       while self.runtime.async_host.address_info.get(handle) is Some(entry) {
         self.runtime.async_host.address_info.remove(handle)
         handle = entry.next
@@ -52,6 +67,14 @@ fn Context::dns_import(
       [I64(handle)]
     }
     _ => {
+      if i64(args[0]) == self.runtime.handles.null_handle {
+        if name == "socket/addrinfo_get_next" {
+          return [I64(self.runtime.handles.null_handle)]
+        }
+        if name == "socket/addrinfo_addr_size" {
+          return [I32(0)]
+        }
+      }
       guard self.runtime.async_host.address_info.get(i64(args[0])) is Some(info) else {
         raise @vm.TypeMismatch
       }

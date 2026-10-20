@@ -73,8 +73,17 @@ fn Context::register(
         }
         let compatible = if module_name == "wasm:js-string" {
           js_string_signature(name, code, actual)
+        } else if module_name == "ffi-bytes" {
+          ffi_bytes_signature(name, actual)
         } else if import_signature(module_name, name) is Some(expected) {
-          actual == expected
+          let params : ReadOnlyArray[@wasm.ValueType] = actual.params.map(ty => {
+            if ty is RefExtern {
+              ExternRef
+            } else {
+              ty
+            }
+          })
+          params == expected.params && actual.results == expected.results
         } else {
           raise @vm.UnknownImport(module_name, name)
         }
@@ -98,7 +107,14 @@ fn Context::register(
                 self.async_import(caller, name, args, family) catch {
                   error => raise import_error(error)
                 }
-              None => self.dispatch(caller, module_name, name, args)
+              None => {
+                let values = self.dispatch(caller, module_name, name, args)
+                if actual.results.is_empty() {
+                  []
+                } else {
+                  values
+                }
+              }
             }
           },
           func_type=actual,
@@ -154,10 +170,22 @@ fn import_signature(module_name : String, name : String) -> @wasm.FuncType? {
   if module_name == "moonbitlang/async" {
     return async_import_spec(name).map(spec => spec.1)
   }
+  if module_name == "moonbitlang/sqlite" {
+    return sqlite_signature(name)
+  }
   let (params, results) : (
     ReadOnlyArray[@wasm.ValueType],
     ReadOnlyArray[@wasm.ValueType],
   ) = match (module_name, name) {
+    ("moonbitlang/core", "env/current_exe" | "env/current_exe_dir") =>
+      ([], [I64])
+    ("moonbit:ffi/memory-sanitizer", name) =>
+      match name {
+        "register-object-alloc" => ([I32, I32], [])
+        "register-object-free" => ([I32], [])
+        "object-is-valid" => ([I32], [I32])
+        _ => return None
+      }
     ("ffi-bytes", name) =>
       match name {
         "new" => ([I32], [ExternRef])
@@ -249,6 +277,44 @@ fn Context::dispatch_impl(
   args : Array[@wasm.Value],
 ) -> Array[@wasm.Value] raise {
   match (module_name, name) {
+    ("moonbitlang/sqlite", _) =>
+      self.sqlite_import(caller, name, args) catch {
+        @sqlite.InvalidHandle =>
+          raise @vm.LinkErrorDetail(
+            "moonbitlang/sqlite.\{name} failed: InvalidHandle",
+          )
+        @sqlite.Fault | @vm.TypeMismatch | @vm.OutOfBoundsMemoryAccess =>
+          raise @vm.LinkErrorDetail("moonbitlang/sqlite.\{name} failed: Fault")
+        @sqlite.Overflow =>
+          raise @vm.LinkErrorDetail(
+            "moonbitlang/sqlite.\{name} failed: Overflow",
+          )
+        error => raise error
+      }
+    ("moonbitlang/core", "env/current_exe" | "env/current_exe_dir") => {
+      guard self.runtime.executable is Some(path) else {
+        self.runtime.async_host.async_errno = if @async.platform is Windows {
+          87
+        } else {
+          22
+        }
+        return [I64(self.runtime.handles.null_handle)]
+      }
+      let path = if name == "env/current_exe_dir" {
+        @path.Path(path).dirname().to_string()
+      } else {
+        path
+      }
+      let bytes = if @async.platform is Windows {
+        @utf16.encode(path + "\u0000", endianness=Little, bom=false)
+      } else {
+        @utf8.encode(path + "\u0000")
+      }
+      let handle = self.runtime.handles.allocate()
+      self.runtime.async_host.buffers[handle] = bytes.to_fixedarray()
+      [I64(handle)]
+    }
+    ("moonbit:ffi/memory-sanitizer", _) => self.memory_sanitizer(name, args)
     ("spectest", "print_char") | ("moonbit", "string_to_js_string") => {
       let unit = i32(args[0])
       self.suspend(() => {
@@ -341,6 +407,9 @@ fn Context::dispatch(
   name : String,
   args : Array[@wasm.Value],
 ) -> Array[@wasm.Value] raise @vm.RuntimeError {
+  // FIXME: Map ABI host exceptions to catchable guest exceptions when Wasmoon
+  // exposes that channel; keep genuine traps separate:
+  // https://github.com/Milky2018/wasmoon/issues/550
   self.dispatch_impl(caller, module_name, name, args) catch {
     error => raise import_error(error)
   }

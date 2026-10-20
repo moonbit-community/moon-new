@@ -414,10 +414,10 @@ async test "ffi-bytes copy preserves overlapping source and checks bounds" {
       #|(module
       #| (import "ffi-bytes" "new" (func $new (param i32) (result externref)))
       #| (import "ffi-bytes" "get" (func $get (param externref i32) (result i32)))
-      #| (func (export "_start") i32.const 1 call $new i32.const 1 call $get drop))
+      #| (func (export "_start") i32.const 1 call $new i32.const 1 call $get if unreachable end))
     ),
   )
-  assert_true(invalid.run() is Trapped(_))
+  assert_eq(invalid.run(), Completed)
 }
 
 ///|

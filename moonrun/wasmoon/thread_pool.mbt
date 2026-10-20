@@ -49,19 +49,23 @@ fn Context::worker_import(
       []
     }
     "thread_pool/free_worker" | "thread_pool/worker_enter_idle" => {
-      guard host.workers.get(i64(args[0])) is Some(worker) && worker.done else {
+      guard host.workers.get(i64(args[0])) is Some(worker) else {
         raise @vm.TypeMismatch
       }
       if name == "thread_pool/free_worker" {
         host.workers.remove(i64(args[0]))
-        if worker.completion is Some(fd) {
-          fd.release()
-        }
+        worker.detach()
+      } else {
+        guard worker.done else { raise @vm.TypeMismatch }
       }
       []
     }
     "thread_pool/cancel_worker" | "thread_pool/cancel_worker_with_retry" => {
       guard host.workers.get(i64(args[0])) is Some(worker) else {
+        raise @vm.TypeMismatch
+      }
+      if name == "thread_pool/cancel_worker_with_retry" &&
+        worker.completion is Some(_) {
         raise @vm.TypeMismatch
       }
       if worker.done {
@@ -77,15 +81,15 @@ fn Context::worker_import(
     | "thread_pool/job_get_err"
     | "thread_pool/free_job" => {
       let handle = i64(args[0])
-      guard host.jobs.get(handle) is Some(job) && !job.running else {
-        raise @vm.TypeMismatch
-      }
+      guard host.jobs.get(handle) is Some(job) else { raise @vm.TypeMismatch }
       if name == "thread_pool/free_job" {
         host.jobs.remove(handle)
         job.dispose()
         []
       } else {
-        guard job.result is Some(result) else { raise @vm.TypeMismatch }
+        guard !job.running && job.result is Some(result) else {
+          raise @vm.TypeMismatch
+        }
         [
           I32(
             if name == "thread_pool/job_get_ret" {

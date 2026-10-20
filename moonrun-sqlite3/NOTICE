@@ -1,0 +1,19 @@
+Binding and executor sources originate from moonbit-community/sqlite3.mbt:
+https://github.com/moonbit-community/sqlite3.mbt
+
+Upstream baseline: 1405639063c52b1474b2622d4c5b5e36110aa74c.
+The copied sources include our host API changes from local commit
+182dfc2ad306f719a96d849e3e9526e00e438c63 (extended diagnostics, native
+authorizer registration, and job lifecycle documentation). Those changes
+were not merged upstream. The binding sources are licensed under Apache-2.0;
+see LICENSE.
+
+This module retains only the native host bindings, moves them into its root
+package, and adapts the tests to that package. Host additions include raw
+preparation tails, statement-null and busy checks, and background cleanup jobs.
+
+The SQLite amalgamation (sqlite3.c and sqlite3.h) is version 3.53.2, copied
+unchanged from libsqlite3-sys 0.38.2 to match the Rust moonrun dependency.
+Crate checksum: f1d20bef17f513b9b3004532233187769cd072d790971f4e4da0e346eb6401e8.
+Its original public-domain notices are retained. sqlite_engine.c mirrors the
+bundled build configuration in that crate's build.rs.

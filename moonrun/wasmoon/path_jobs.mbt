@@ -58,17 +58,8 @@ fn Context::path_job_import(
         ),
       ]
     }
-    "thread_pool/get_realpath_result" => {
-      guard host.jobs.get(i64(args[0])) is Some(job) &&
-        !job.running &&
-        job.result is Some(result) &&
-        result.ret >= 0 else {
-        raise @vm.TypeMismatch
-      }
-      let handle = self.runtime.handles.allocate()
-      host.buffers[handle] = result.data.to_fixedarray()
-      [I64(handle)]
-    }
+    "thread_pool/get_realpath_result" =>
+      [I64(host.realpath_result(i64(args[0])))]
     _ => raise @vm.UnknownImport("moonbitlang/async", name)
   }
 }

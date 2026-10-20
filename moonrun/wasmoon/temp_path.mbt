@@ -14,7 +14,11 @@ fn Context::temporary_path_import(
       .unwrap_or(true)
     }) {
     host.async_errno = 5
-    return if name == "fs/get_tmp_path_buffer" { [I64(0L)] } else { [I32(-1)] }
+    return if name == "fs/get_tmp_path_buffer" {
+      [I64(self.runtime.handles.null_handle)]
+    } else {
+      [I32(-1)]
+    }
   }
   let path = self.runtime.filesystem.temporary_path()
   match name {

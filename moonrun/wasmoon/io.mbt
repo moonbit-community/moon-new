@@ -8,7 +8,7 @@ fn Context::pipe_import(
   let host = self.runtime.async_host
   try {
     if name == "fd_util/invalid_fd" {
-      return [I64(0L)]
+      return [I64(self.runtime.handles.invalid_fd)]
     }
     if name == "fd_util/pipe" {
       let memory = guest_memory(caller)

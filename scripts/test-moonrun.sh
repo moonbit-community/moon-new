@@ -53,6 +53,11 @@ for target in "${targets[@]}"; do
     "$runner" "$program" > "$scratch/actual"
     cmp "$scratch/expected" "$scratch/actual"
 
+    program="$fixtures/_build/$target/debug/build/sqlite/sqlite.wasm"
+    MOONBIT_ASYNC_CHECK_FD_LEAK=1 moonrun "$program" "$scratch/sqlite-official.db" > "$scratch/expected"
+    MOONBIT_ASYNC_CHECK_FD_LEAK=1 "$runner" "$program" "$scratch/sqlite-candidate.db" > "$scratch/actual"
+    cmp "$scratch/expected" "$scratch/actual"
+
     program="$fixtures/_build/$target/debug/build/async_fs/async_fs.wasm"
     mkdir "$scratch/async-files"
     moonrun "$program" "$scratch/async-files" > "$scratch/expected"

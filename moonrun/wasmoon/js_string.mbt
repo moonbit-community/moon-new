@@ -70,7 +70,7 @@ fn Context::js_string(
     "compare" => {
       let left = self.text(args[0])
       let right = self.text(args[1])
-      [I32(if left < right { -1 } else if left > right { 1 } else { 0 })]
+      [I32(left[:].lexical_compare(right[:]))]
     }
     "fromCharCodeArray" => {
       guard args[0] is ArrayRef(array) else { raise @vm.Unreachable }

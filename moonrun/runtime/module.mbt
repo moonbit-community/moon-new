@@ -3,6 +3,7 @@
 pub struct Module {
   priv code : @wasm.Module
   priv name : String
+  priv executable : String?
 }
 
 ///|
@@ -12,12 +13,14 @@ pub fn Module::from_bytes(
 ) -> Module raise {
   let code = @parser.parse_module(bytes)
   @validator.validate_module(code)
-  { code, name, }
+  { code, name, executable: None, }
 }
 
 ///|
 pub async fn Module::load_file(path : String) -> Module {
-  Module::from_bytes(@fs.read_file(path).binary(), name=path)
+  let executable = @path.Path(path).resolve().to_string()
+  let module_ = Module::from_bytes(@fs.read_file(path).binary(), name=path)
+  { ..module_, executable: Some(executable), }
 }
 
 ///|
@@ -49,7 +52,8 @@ pub async fn Module::run(
   guard @fs.kind(directory) is Directory else {
     raise @vm.LinkErrorDetail("working directory must be a directory")
   }
-  @async.with_task_group(group => {
+  let leaked = Ref(false)
+  let result = @async.with_task_group(group => {
     let control = control.unwrap_or_else(() => RunControl())
     guard control.deliver is None else {
       raise @vm.LinkErrorDetail("run control is already attached to a guest")
@@ -64,17 +68,36 @@ pub async fn Module::run(
       stderr,
       group,
       policy,
+      self.executable,
     )
     let context = @wasmoon.Context(state)
     group.add_defer(() => {
       control.deliver = None
-      state.close()
-      context.close()
+      defer {
+        state.close()
+        context.close()
+      }
+      if env.contains("MOONBIT_ASYNC_CHECK_FD_LEAK") &&
+        state.leak_summary() is Some(summary) {
+        leaked.val = true
+        @async.protect_from_cancel(() => {
+          state.stdio.output(
+            2,
+            @utf8.encode("moonrun Runtime leaked host state: \{summary}\n"),
+          )
+        })
+      }
     })
     control.deliver = Some(signal => state.async_host.deliver_signal(signal))
     defer {
       state.async_host.shutting_down = true
+      state.sqlite.release_entered_mutexes()
     }
     context.execute(linker, self.code, selection)
   })
+  if leaked.val {
+    Exited(101)
+  } else {
+    result
+  }
 }

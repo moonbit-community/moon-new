@@ -7,6 +7,8 @@ package "moonbit-community/moonrun/runtime/handles"
 
 // Types and methods
 pub struct Handles {
+  invalid_fd : Int64
+  null_handle : Int64
   // private fields
 }
 pub fn Handles::Handles() -> Self

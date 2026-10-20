@@ -9,7 +9,16 @@ fn Context::buffer_import(
   match name {
     "time/get_ms_since_epoch" => [I64(@async.now())]
     "os_error/get_errno" => [I32(host.async_errno)]
-    "c_buffer/is_null" => [I32(if i64(args[0]) == 0L { 1 } else { 0 })]
+    "c_buffer/is_null" =>
+      [
+        I32(
+          if i64(args[0]) == self.runtime.handles.null_handle {
+            1
+          } else {
+            0
+          },
+        ),
+      ]
     "c_buffer/length" | "c_buffer/strlen" | "c_buffer/c_buffer_get" => {
       guard host.buffers.get(i64(args[0])) is Some(buffer) else {
         raise @vm.TypeMismatch
@@ -43,7 +52,7 @@ fn Context::buffer_import(
     }
     "c_buffer/free" => {
       let handle = i64(args[0])
-      if handle != 0L {
+      if handle != self.runtime.handles.null_handle {
         guard host.buffers.contains(handle) else { raise @vm.TypeMismatch }
         host.buffers.remove(handle)
       }

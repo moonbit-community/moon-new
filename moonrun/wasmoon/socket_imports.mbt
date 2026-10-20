@@ -84,7 +84,7 @@ fn Context::socket_import(
     let family = i32(args[0])
     guard family == 4 || family == 6 else {
       host.async_errno = if @async.platform is Windows { 87 } else { 22 }
-      return [I64(0L)]
+      return [I64(self.runtime.handles.invalid_fd)]
     }
     let udp = name == "socket/make_udp_socket"
     let multicast = udp && i32(args[1]) != 0
@@ -96,7 +96,7 @@ fn Context::socket_import(
       }
       if @sys.socket_invalid(fd) {
         host.async_errno = @os_error.get_errno()
-        return [I64(0L)]
+        return [I64(self.runtime.handles.invalid_fd)]
       }
       let resource = @resource.Resource::new_socket(fd, host.group)
       let handle = self.runtime.handles.allocate()
@@ -105,7 +105,11 @@ fn Context::socket_import(
     })
   }
   guard self.socket(args[0]) is Some(fd) else {
-    return if name == "socket/accept/unix" { [I64(0L)] } else { [I32(-1)] }
+    return if name == "socket/accept/unix" {
+      [I64(self.runtime.handles.invalid_fd)]
+    } else {
+      [I32(-1)]
+    }
   }
   try {
     match name {
@@ -174,7 +178,7 @@ fn Context::socket_import(
           )
           if @sys.socket_invalid(accepted) {
             host.async_errno = @os_error.get_errno()
-            return [I64(0L)]
+            return [I64(self.runtime.handles.invalid_fd)]
           }
           let resource = @resource.Resource::new_socket(accepted, host.group)
           let handle = self.runtime.handles.allocate()
@@ -238,7 +242,7 @@ fn Context::socket_import(
     @vm.OutOfBoundsMemoryAccess | @sys.Bounds => {
       host.async_errno = @sys.fault_errno
       if name == "socket/accept/unix" {
-        [I64(0L)]
+        [I64(self.runtime.handles.invalid_fd)]
       } else {
         [I32(-1)]
       }

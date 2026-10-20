@@ -1,11 +1,13 @@
 ///|
 pub struct Job {
   priv action : async () -> @resource.JobResult
-  priv cleanup : (() -> Unit)?
+  priv mut cleanup : (() -> Unit)?
   mut result : @resource.JobResult?
   mut running : Bool
   priv mut result_handle : PublishedResult?
   spawn : @process.SpawnOptions?
+  sqlite : @sqlite.Job?
+  priv mut detached : Bool
 }
 
 ///|
@@ -13,15 +15,21 @@ pub(all) enum PublishedResult {
   OpenedFile(Int64)
   ResolvedAddresses(Int64)
   SpawnedProcess(Int64)
+  BorrowedBuffer(Int64)
 }
 
 ///|
 pub fn Job::dispose(self : Job) -> Unit {
+  if self.running {
+    self.detached = true
+    return
+  }
   if self.result is Some(result) && result.opened is Some(fd) {
     fd.release()
     result.opened = None
   }
   if self.cleanup is Some(cleanup) {
+    self.cleanup = None
     cleanup()
   }
 }
@@ -31,6 +39,8 @@ pub struct Worker {
   mut task : @async.Task[Unit]?
   mut done : Bool
   completion : @resource.Resource?
+  mut detached : Bool
+  priv mut completion_owned : Bool
 }
 
 ///|
@@ -83,6 +93,7 @@ pub fn AsyncHost::new_job(
   self : AsyncHost,
   action : async () -> @resource.JobResult,
   cleanup? : () -> Unit,
+  sqlite? : @sqlite.Job,
 ) -> Int64 {
   let handle = self.handles.allocate()
   self.jobs[handle] = {
@@ -92,6 +103,8 @@ pub fn AsyncHost::new_job(
     running: false,
     result_handle: None,
     spawn: None,
+    sqlite,
+    detached: false,
   }
   handle
 }
@@ -112,6 +125,15 @@ pub fn AsyncHost::start_worker(
   job.running = true
   worker.task = Some(
     self.group.spawn(no_wait=true, () => {
+      defer {
+        job.running = false
+        if job.detached {
+          job.dispose()
+        }
+        if worker.detached {
+          worker.close()
+        }
+      }
       let result = @async.handle_cancellation(() => {
         (job.action)() catch {
           @os_error.OSError(code, ..) =>
@@ -137,7 +159,7 @@ pub fn AsyncHost::start_worker(
       )
       job.running = false
       worker.done = true
-      if !self.shutting_down {
+      if !self.shutting_down && !worker.detached {
         if worker.completion is Some(fd) {
           fd.retain()
           defer fd.release()
@@ -214,13 +236,26 @@ pub fn AsyncHost::spawn_worker(
   job : Job,
   completion : @resource.Resource?,
 ) -> Int64 raise @sys.HostError {
-  let worker : Worker = { task: None, done: false, completion, }
-  let handle = self.handles.allocate()
-  self.workers[handle] = worker
-  self.start_worker(worker, id, job)
+  if completion is Some(fd) {
+    guard fd.owner is Pipe(_, false) && fd.guest_async else {
+      raise @sys.Invalid
+    }
+  }
+  let worker : Worker = {
+    task: None,
+    done: false,
+    completion,
+    detached: false,
+    completion_owned: false,
+  }
   if completion is Some(fd) {
     fd.retain()
+    worker.completion_owned = true
   }
+  errdefer worker.close()
+  self.start_worker(worker, id, job)
+  let handle = self.handles.allocate()
+  self.workers[handle] = worker
   handle
 }
 
@@ -256,4 +291,25 @@ pub async fn Job::run_inline(self : Job) -> Unit {
       error => raise error
     },
   )
+}
+
+///|
+pub fn Worker::close(self : Worker) -> Unit {
+  if self.completion_owned {
+    self.completion_owned = false
+    if self.completion is Some(fd) {
+      fd.release()
+    }
+  }
+}
+
+///|
+pub fn Worker::detach(self : Worker) -> Unit {
+  self.detached = true
+  if self.done {
+    self.close()
+  }
+  if self.task is Some(task) {
+    task.cancel()
+  }
 }

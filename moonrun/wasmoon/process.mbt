@@ -295,8 +295,10 @@ fn Context::process_import(
       let descriptors = Array::make(3, None)
       for index in 0..<3 {
         let handle = i64(args[base + index])
-        if handle != 0L {
-          guard host.fds.get(handle) is Some(fd) else { raise @vm.TypeMismatch }
+        if handle != self.runtime.handles.invalid_fd {
+          guard host.fds.get(handle) is Some(fd) else {
+            raise @sys.Operation("Badf: invalid spawn stdio handle")
+          }
           descriptors[index] = Some(fd)
         }
       }
@@ -343,7 +345,7 @@ fn Context::process_import(
       let handle = host.spawn_job_result(self.runtime.process, i64(args[0])) catch {
         @os_error.OSError(code, ..) => {
           host.async_errno = code
-          0L
+          self.runtime.handles.null_handle
         }
         error => raise error
       }
@@ -354,8 +356,13 @@ fn Context::process_import(
       let handle = self.runtime.process.open_pid_handle(pid) catch {
         @os_error.OSError(code, ..) => {
           host.async_errno = code
-          0L
+          return [I64(self.runtime.handles.invalid_fd)]
         }
+      }
+      if handle == self.runtime.handles.invalid_fd {
+        // Unix may successfully fall back to PID-based waiting. Native async
+        // clears errno to distinguish this case from a failed open.
+        host.async_errno = 0
       }
       [I64(handle)]
     }
@@ -365,7 +372,7 @@ fn Context::process_import(
       if self.runtime.policy is None &&
         (
           self.runtime.process.process_handles.get(handle) is Some(External(_)) ||
-          handle == 0L
+          handle == self.runtime.handles.invalid_fd
         ) &&
         !(self.runtime.process.children.get(pid) is Some(child) &&
         !child.consumed) {
@@ -387,7 +394,10 @@ fn Context::process_import(
         !child.consumed else {
         raise @vm.TypeMismatch
       }
-      guard (handle == 0L && !(@async.platform is Windows)) ||
+      guard (
+          handle == self.runtime.handles.invalid_fd &&
+          !(@async.platform is Windows)
+        ) ||
         (
           self.runtime.process.process_handles.get(handle)
           is Some(@process.Child(owner)) &&

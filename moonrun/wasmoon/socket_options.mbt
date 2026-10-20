@@ -42,7 +42,11 @@ fn Context::socket_option_import(
     let fd = @sys.make_udp_socket(4, false)
     if @sys.socket_invalid(fd) {
       host.async_errno = @os_error.get_errno()
-      return if name == "socket/if_nametoindex" { [I32(0)] } else { [I64(0L)] }
+      return if name == "socket/if_nametoindex" {
+        [I32(0)]
+      } else {
+        [I64(self.runtime.handles.null_handle)]
+      }
     }
     defer @sys.close_socket(fd)
     if name == "socket/if_nametoindex" {
@@ -61,7 +65,7 @@ fn Context::socket_option_import(
       let data = @sys.interface_name(fd, i32(args[0]).reinterpret_as_uint())
       if data.is_empty() {
         host.async_errno = @os_error.get_errno()
-        return [I64(0L)]
+        return [I64(self.runtime.handles.null_handle)]
       }
       let handle = self.runtime.handles.allocate()
       host.buffers[handle] = data.to_fixedarray()

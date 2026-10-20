@@ -106,7 +106,7 @@ fn Context::watcher_import(
     let fd = @sys.create_watcher()
     if fd == @sys.invalid_native_fd() {
       host.async_errno = @os_error.get_errno()
-      return [I64(0L)]
+      return [I64(self.runtime.handles.invalid_fd)]
     }
     let handle = self.runtime.handles.allocate()
     host.fds[handle] = @resource.Resource(

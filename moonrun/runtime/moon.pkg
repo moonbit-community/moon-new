@@ -2,6 +2,8 @@ import {
   "moonbitlang/async",
   "moonbitlang/core/env",
   "moonbitlang/async/fs",
+  "moonbitlang/x/path",
+  "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",
   "Milky2018/wasm_core/parser",
   "moonbit-community/moonrun/policy",
@@ -18,8 +20,8 @@ import {
   "Milky2018/wasm_core/encoder",
   "moonbitlang/async/process" @native_process,
   "moonbitlang/async/signal",
-  "moonbitlang/core/encoding/utf8",
   "Milky2018/wasm_core/wat",
+  "moonbitlang/core/encoding/utf16",
 } for "test"
 
 options(

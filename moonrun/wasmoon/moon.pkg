@@ -1,4 +1,5 @@
 import {
+  "moonbit-community/moonrun/sqlite",
   "moonbitlang/async",
   "moonbit-community/moonrun/async_host",
   "moonbitlang/core/cmp",

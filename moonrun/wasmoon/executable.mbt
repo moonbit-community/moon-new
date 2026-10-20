@@ -49,7 +49,11 @@ pub async fn Context::execute(
       }
     }
   }
-  outcome
+  if outcome is Completed && !self.sanitizer_objects.is_empty() {
+    Trapped(self.sanitizer_leak_report())
+  } else {
+    outcome
+  }
 }
 
 ///|
@@ -75,6 +79,7 @@ async fn Context::call(
   index : Int32,
   args : Array[@wasm.Value],
 ) -> Array[@wasm.Value] {
+  let mut yielded_at = @wasi.native_clock_gettime_monotonic()
   let mut outcome = @executor.call_func_by_index_resumable(
     store,
     instance,
@@ -95,7 +100,13 @@ async fn Context::call(
       Suspended(reason, continuation) => {
         errdefer continuation.cancel()
         match reason {
-          CooperativeYield => @async.sleep(0)
+          CooperativeYield =>
+            // Bound guest CPU slices while avoiding an event-loop turn for
+            // every 1,024-instruction Wasmoon continuation.
+            if @wasi.native_clock_gettime_monotonic() - yielded_at >= 1000000L {
+              @async.sleep(0)
+              yielded_at = @wasi.native_clock_gettime_monotonic()
+            }
           HostCall(1L) => {
             guard self.pending is Some(action) else {
               raise @vm.UnhandledSuspension
@@ -109,6 +120,7 @@ async fn Context::call(
                 error => raise error
               },
             )
+            yielded_at = @wasi.native_clock_gettime_monotonic()
           }
           AtomicWait => @async.sleep(1)
           _ => raise @vm.UnhandledSuspension
