@@ -1,5 +1,5 @@
 ///|
-async test "guest worker completion is delivered through its own event bus" {
+test "guest worker completion is delivered through its own event bus" {
   let source =
     #|(module
     #| (import "moonbitlang/async" "event_bus/create" (func $bus (result i64)))
@@ -25,23 +25,20 @@ async test "guest worker completion is delivered through its own event bus" {
   let program = compile(
     source.replace(
       old="COMPLETION",
-      new=if @async.platform is Windows {
+      new=if @sys.platform is Windows {
         "local.get $bus i32.const 0 call $event call $bytes i32.const 42 i32.ne if unreachable end"
       } else {
         "local.get $source i32.const 0 i32.const 1 call $fetch i32.const 4 i32.ne if unreachable end i32.const 0 i32.load i32.const 42 i32.ne if unreachable end"
       },
     ),
   )
-  assert_eq(@async.all([() => program.run(), () => program.run()]), [
-    Completed,
-    Completed,
-  ])
+  assert_eq([program.run(), program.run()], [Completed, Completed])
 }
 
 ///|
-async test "file jobs retain resources and own buffers across memory growth" {
-  let directory = @fs.tmpdir(prefix="moonrun-worker-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
+test "file jobs retain resources and own buffers across memory growth" {
+  let directory = @sys.tmpdir(prefix="moonrun-worker-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
   let source =
     #|(module
     #| (import "moonbitlang/async" "event_bus/create" (func $bus (result i64)))
@@ -94,7 +91,7 @@ async test "file jobs retain resources and own buffers across memory growth" {
   let program = compile(
     source.replace(
       old="FETCH",
-      new=if @async.platform is Windows {
+      new=if @sys.platform is Windows {
         ""
       } else {
         "global.get $source i32.const 0 i32.const 32 call $fetch drop"
@@ -102,11 +99,11 @@ async test "file jobs retain resources and own buffers across memory growth" {
     ),
   )
   assert_eq(program.run(cwd=directory), Completed)
-  assert_eq(@fs.read_file(directory + "/file").binary(), b"hello")
+  assert_eq(@sys.read_file(directory + "/file"), b"hello")
 }
 
 ///|
-async test "standard stream file kind uses the native stat output" {
+test "standard stream file kind uses the native stat output" {
   let program = compile(
     (
       #|(module
@@ -120,7 +117,7 @@ async test "standard stream file kind uses the native stat output" {
 }
 
 ///|
-async test "embedding forwards guest signals without terminating the host" {
+test "embedding forwards guest signals without terminating the host" {
   let source =
     #|(module
     #| (import "moonbitlang/async" "event_bus/create" (func $bus (result i64)))
@@ -148,40 +145,40 @@ async test "embedding forwards guest signals without terminating the host" {
   let program = compile(
     source.replace(
       old="COMPLETION",
-      new=if @async.platform is Windows {
+      new=if @sys.platform is Windows {
         "local.get $bus i32.const 0 call $event call $bytes"
       } else {
         "local.get $pool i32.const 16 i32.const 1 call $fetch i32.const 4 i32.ne if unreachable end i32.const 16 i32.load"
       },
     ),
   )
-  let control = @runtime.RunControl()
   let started = Ref(false)
-  let ready = @cond_var.Cond()
-  let signal = @signal.Signal::SIGINT.to_int()
-  assert_false(control.send_signal(signal))
-  @async.with_task_group(group => {
-    let run = group.spawn(() => {
-      program.run(control~, stdout=bytes => {
-        if bytes == b"*" {
-          started.val = true
-          ready.signal()
-        }
-      })
-    })
-    while !started.val {
-      ready.wait()
+  let sent = Ref(false)
+  let signal = @sys.Signal::SIGINT.to_int()
+  let control = @runtime.RunControl(poll=() => {
+    if started.val && !sent.val {
+      sent.val = true
+      Some(signal)
+    } else {
+      None
     }
-    assert_false(control.send_signal(-1))
-    assert_true(control.send_signal(signal))
-    assert_eq(run.wait(), Signaled(signal))
   })
+  assert_false(control.send_signal(signal))
+  assert_eq(
+    program.run(control~, stdout=bytes => {
+      if bytes == b"*" {
+        started.val = true
+      }
+    }),
+    Signaled(signal),
+  )
+  assert_true(sent.val)
   assert_false(control.send_signal(signal))
 }
 
 ///|
-async test "Windows I/O completion retains input across memory growth and handle close" {
-  if !(@async.platform is Windows) {
+test "Windows I/O completion retains input across memory growth and handle close" {
+  if !(@sys.platform is Windows) {
     return
   }
   let source =
@@ -238,4 +235,72 @@ async test "Windows I/O completion retains input across memory growth and handle
     #|       local.get $index i32.const 1 i32.add local.tee $index local.get $count i32.lt_s br_if $events)
     #|     br $again))))
   assert_eq(compile(source).run(), Completed)
+}
+
+///|
+test "destroying a guest bus retains native storage until pending workers join" {
+  let source =
+    #|(module
+    #| (import "moonbitlang/async" "event_bus/create" (func $bus (result i64)))
+    #| (import "moonbitlang/async" "event_bus/destroy" (func $close_bus (param i64)))
+    #| (import "moonbitlang/async" "thread_pool/init_thread_pool" (func $pool (param i64) (result i64)))
+    #| (import "moonbitlang/async" "thread_pool/make_sleep_job" (func $sleep (param i32) (result i64)))
+    #| (import "moonbitlang/async" "thread_pool/spawn_worker" (func $spawn (param i32 i64) (result i64)))
+    #| (import "moonbitlang/async" "thread_pool/free_worker" (func $close_worker (param i64)))
+    #| (import "moonbitlang/async" "thread_pool/free_job" (func $free (param i64)))
+    #| (import "moonbitlang/async" "thread_pool/destroy_thread_pool" (func $close_pool))
+    #| (func (export "_start") (local $bus i64) (local $job i64) (local $worker i64)
+    #|   call $bus local.tee $bus call $pool drop
+    #|   i32.const 1000 call $sleep local.set $job
+    #|   i32.const 7 local.get $job call $spawn local.set $worker
+    #|   local.get $bus call $close_bus
+    #|   local.get $worker call $close_worker
+    #|   local.get $job call $free
+    #|   call $close_pool))
+  for _ in 0..<5 {
+    assert_eq(compile(source).run(), Completed)
+  }
+}
+
+///|
+test "small Unix completion buffers re-arm unconsumed worker notices" {
+  if @sys.platform is Windows {
+    return
+  }
+  let source =
+    #|(module
+    #| (import "moonbitlang/async" "event_bus/create" (func $bus (result i64)))
+    #| (import "moonbitlang/async" "event_bus/destroy" (func $close_bus (param i64)))
+    #| (import "moonbitlang/async" "event_bus/wait" (func $wait (param i64 i32) (result i32)))
+    #| (import "moonbitlang/async" "thread_pool/init_thread_pool" (func $pool (param i64) (result i64)))
+    #| (import "moonbitlang/async" "thread_pool/make_sleep_job" (func $sleep (param i32) (result i64)))
+    #| (import "moonbitlang/async" "thread_pool/spawn_worker" (func $spawn (param i32 i64) (result i64)))
+    #| (import "moonbitlang/async" "thread_pool/free_worker" (func $close_worker (param i64)))
+    #| (import "moonbitlang/async" "thread_pool/free_job" (func $free (param i64)))
+    #| (import "moonbitlang/async" "thread_pool/run_job" (func $run (param i64)))
+    #| (import "moonbitlang/async" "thread_pool/fetch_completion/unix" (func $fetch (param i64 i32 i32) (result i32)))
+    #| (import "moonbitlang/async" "thread_pool/destroy_thread_pool" (func $close_pool))
+    #| (memory (export "memory") 1)
+    #| (func $next (param $bus i64) (param $pool i64) (result i32)
+    #|   local.get $bus i32.const 1000 call $wait i32.const 1 i32.lt_s if unreachable end
+    #|   local.get $pool i32.const 0 i32.const 1 call $fetch i32.const 4 i32.ne if unreachable end
+    #|   i32.const 0 i32.load)
+    #| (func (export "_start") (local $bus i64) (local $pool i64)
+    #|   (local $first i64) (local $second i64) (local $delay i64)
+    #|   (local $w1 i64) (local $w2 i64) (local $id i32)
+    #|   call $bus local.tee $bus call $pool local.set $pool
+    #|   i32.const 0 call $sleep local.set $first
+    #|   i32.const 0 call $sleep local.set $second
+    #|   i32.const 1 local.get $first call $spawn local.set $w1
+    #|   i32.const 2 local.get $second call $spawn local.set $w2
+    #|   i32.const 20 call $sleep local.tee $delay call $run
+    #|   local.get $delay call $free
+    #|   local.get $bus local.get $pool call $next local.set $id
+    #|   local.get $bus local.get $pool call $next local.get $id i32.add i32.const 3 i32.ne if unreachable end
+    #|   local.get $w1 call $close_worker local.get $w2 call $close_worker
+    #|   local.get $first call $free local.get $second call $free
+    #|   call $close_pool local.get $bus call $close_bus))
+  for _ in 0..<5 {
+    assert_eq(compile(source).run(), Completed)
+  }
 }

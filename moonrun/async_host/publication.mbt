@@ -108,6 +108,7 @@ pub fn AsyncHost::new_spawn_job(
         }
       }
     }),
+    work: None,
     result: None,
     running: false,
     result_handle: None,
@@ -123,7 +124,7 @@ pub fn AsyncHost::spawn_job_result(
   self : AsyncHost,
   process : @process.HostProcess,
   handle : Int64,
-) -> Int64 raise @os_error.OSError {
+) -> Int64 raise @sys.OSError {
   guard self.jobs.get(handle) is Some(job) &&
     job.spawn is Some(spawn) &&
     spawn.child is Some(child) else {

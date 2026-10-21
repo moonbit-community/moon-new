@@ -53,7 +53,7 @@ fn Context::legacy_async_import(
       }
       let buffer = FixedArray::make(length, b'\x00')
       guard @wasi.native_getrandom(buffer, length) else {
-        host.async_errno = @os_error.get_errno()
+        host.async_errno = @sys.get_errno()
         return [I32(-1)]
       }
       memory.init_data_at(pointer, Bytes::from_array(buffer))
@@ -80,9 +80,9 @@ fn Context::legacy_async_import(
       match result {
         [I32(1)] => [I32(0)]
         [I32(0)] => {
-          host.async_errno = if @async.platform is Windows {
+          host.async_errno = if @sys.platform is Windows {
             50
-          } else if @async.platform is MacOS {
+          } else if @sys.platform is MacOS {
             45
           } else {
             95
@@ -103,9 +103,9 @@ fn Context::legacy_async_import(
       [
         I32(
           if i32(args[0]) ==
-            (if @async.platform is Windows {
+            (if @sys.platform is Windows {
               33
-            } else if @async.platform is MacOS {
+            } else if @sys.platform is MacOS {
               35
             } else {
               11
@@ -122,38 +122,36 @@ fn Context::legacy_async_import(
         return [I32(-1)]
       }
       let exclusive = name == "fs/try_lock_file" && i32(args[1]) != 0
-      self.suspend(() => {
-        try {
-          if exclusive {
-            filesystem.authorize_resource(fd, true)
-          }
-          if name == "fs/unlock_file" {
-            file.unlock()
-          } else if !file.try_lock(
-              if i32(args[1]) != 0 {
-                Exclusive
-              } else {
-                Shared
-              },
-            ) {
-            host.async_errno = if @async.platform is Windows {
-              33
-            } else if @async.platform is MacOS {
-              35
-            } else {
-              11
-            }
-            return [I32(-1)]
-          }
-          [I32(0)]
-        } catch {
-          @os_error.OSError(code, ..) => {
-            host.async_errno = code
-            [I32(-1)]
-          }
-          error => raise @vm.LinkErrorDetail("file lock: \{error}")
+      try {
+        if exclusive {
+          filesystem.authorize_resource(fd, true)
         }
-      })
+        if name == "fs/unlock_file" {
+          file.unlock()
+        } else if !file.try_lock(
+            if i32(args[1]) != 0 {
+              Exclusive
+            } else {
+              Shared
+            },
+          ) {
+          host.async_errno = if @sys.platform is Windows {
+            33
+          } else if @sys.platform is MacOS {
+            35
+          } else {
+            11
+          }
+          return [I32(-1)]
+        }
+        [I32(0)]
+      } catch {
+        @sys.OSError(code, ..) => {
+          host.async_errno = code
+          [I32(-1)]
+        }
+        error => raise @vm.LinkErrorDetail("file lock: \{error}")
+      }
     }
     "thread_pool/make_file_kind_by_path_job"
     | "thread_pool/make_file_time_by_path_job" => {
@@ -178,7 +176,7 @@ fn Context::legacy_async_import(
           host.new_job(
             () => {
               filesystem.authorize_at(path, parent, follow)
-              let result = @native_jobs.run_native_job(
+              let task = @native_jobs.make_native_job(
                 StatPath,
                 path,
                 parent
@@ -196,14 +194,17 @@ fn Context::legacy_async_import(
                 },
                 follow,
               )
-              {
-                ..result,
-                ret: if kind && result.ret >= 0 {
-                  @sys.buffer_word(result.data.to_fixedarray(), 8, 8).to_int()
-                } else {
-                  result.ret
-                },
-              }
+              @resource.Task(task.operation, publish=() => {
+                let result = task.publish()
+                {
+                  ..result,
+                  ret: if kind && result.ret >= 0 {
+                    @sys.buffer_word(result.data.to_fixedarray(), 8, 8).to_int()
+                  } else {
+                    result.ret
+                  },
+                }
+              })
             },
             cleanup=() => if parent is Some(fd) { fd.release() },
           ),
@@ -221,20 +222,21 @@ fn Context::legacy_async_import(
           host.new_job(
             () => {
               filesystem.authorize_resource(fd, false)
-              let data = @native_jobs.packed_stat(
-                fd.native(),
-                if size {
-                  2
-                } else {
-                  112
-                },
-                if size {
-                  16
-                } else {
-                  56
-                },
+              @resource.Task(
+                @sys.fstat_job(
+                  fd.native(),
+                  if size {
+                    2
+                  } else {
+                    112
+                  },
+                  if size {
+                    16
+                  } else {
+                    56
+                  },
+                ),
               )
-              { ret: 0, errno: 0, data, opened: None, }
             },
             cleanup=() => fd.release(),
           ),
@@ -283,10 +285,8 @@ fn Context::legacy_async_import(
       guard host.jobs.get(i64(args[0])) is Some(job) else {
         raise @vm.TypeMismatch
       }
-      self.suspend(() => {
-        job.run_inline()
-        []
-      })
+      job.run_inline(poll=() => self.progress())
+      []
     }
     "thread_pool/spawn_worker_with_pipe" =>
       self.worker_import(caller, name, args)

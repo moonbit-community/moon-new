@@ -1,6 +1,6 @@
 ///|
 pub fn invokes_moonx(command : String) -> Bool {
-  let program = if @async.platform is Windows {
+  let program = if @sys.platform is Windows {
     let output = StringBuilder()
     let mut quoted = false
     for c in command {
@@ -24,16 +24,16 @@ pub fn invokes_moonx(command : String) -> Bool {
 /// Consume an inherited native policy descriptor. The caller transfers ownership
 /// of this descriptor and must remove its environment marker before provisioning
 /// the guest environment. Invalid transfers fail without running the guest.
-pub async fn Policy::from_inherited_handle(token : String) -> Policy {
+pub fn Policy::from_inherited_handle(token : String) -> Policy raise {
   let token = @string.parse_uint64(token)
   let fd = @sys.adopt_policy_fd(token)
   if fd == @sys.invalid_native_fd() {
-    @os_error.check_errno("inherited policy handle")
+    @sys.check_errno("inherited policy handle")
   }
   defer ignore(@sys.close_guest_pipe(fd))
   let result = @native_jobs.run_native_job(ReadPolicy, "", fd, 0, 0, false)
   if result.ret < 0 {
-    raise @os_error.OSError(result.errno, context="inherited policy read")
+    raise @sys.OSError(result.errno, context="inherited policy read")
   }
   Policy::from_json(@utf8.decode(result.data))
 }

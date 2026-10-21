@@ -1,6 +1,6 @@
 ///|
 pub fn HostFs::temporary_path(self : HostFs) -> String raise @sys.HostError {
-  let from_env = if @async.platform is Windows {
+  let from_env = if @sys.platform is Windows {
     match
       @environment.environment_entry(self.env, "TMP")
       .map(entry => entry.1)
@@ -21,7 +21,7 @@ pub fn HostFs::temporary_path(self : HostFs) -> String raise @sys.HostError {
       guard !buffer.is_empty() else {
         raise @sys.Operation("failed to obtain temporary directory")
       }
-      if @async.platform is Windows {
+      if @sys.platform is Windows {
         @utf16.decode(buffer, endianness=Little) catch {
           _ => raise @sys.Invalid
         }
@@ -32,10 +32,9 @@ pub fn HostFs::temporary_path(self : HostFs) -> String raise @sys.HostError {
       }
     }
   }
-  if path.has_suffix("/") ||
-    (@async.platform is Windows && path.has_suffix("\\")) {
+  if path.has_suffix("/") || (@sys.platform is Windows && path.has_suffix("\\")) {
     path
   } else {
-    path + (if @async.platform is Windows { "\\" } else { "/" })
+    path + (if @sys.platform is Windows { "\\" } else { "/" })
   }
 }

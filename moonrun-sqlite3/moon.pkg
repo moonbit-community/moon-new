@@ -1,7 +1,5 @@
 import {
-  "moonbitlang/async/os_error",
-  "moonbitlang/async/pipe",
-  "moonbitlang/async/types",
+  "moonbit-community/moonrun-sqlite3/io" @pipe,
 }
 
 options(

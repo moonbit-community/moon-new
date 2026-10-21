@@ -81,7 +81,7 @@ fn Context::process_import(
     "process/get_curr_env" => {
       let entries = self.inherited_process_env()
       self.put_process_env(
-        if @async.platform is Windows {
+        if @sys.platform is Windows {
           Wide(
             @utf16.encode(
               entries.join("\u0000") + "\u0000\u0000",
@@ -100,7 +100,7 @@ fn Context::process_import(
         raise @vm.OutOfBoundsMemoryAccess
       }
       self.put_process_env(
-        if @async.platform is Windows {
+        if @sys.platform is Windows {
           Wide(FixedArray::make((size + 1) * 2, b'\x00'))
         } else {
           Entries(Array::make(size, None))
@@ -235,7 +235,7 @@ fn Context::process_import(
       name == "thread_pool/make_spawn_job/unix" ||
       name == "thread_pool/make_spawn_job/windows" => {
       let windows = name.has_suffix("/windows")
-      guard windows == (@async.platform is Windows) else {
+      guard windows == (@sys.platform is Windows) else {
         raise @vm.UnknownImport("moonbitlang/async", name)
       }
       let legacy = name.has_prefix("thread_pool/make_spawn_job/")
@@ -343,7 +343,7 @@ fn Context::process_import(
     "thread_pool/spawn_job_get_result_handle"
     | "thread_pool/get_spawn_job_result_handle" => {
       let handle = host.spawn_job_result(self.runtime.process, i64(args[0])) catch {
-        @os_error.OSError(code, ..) => {
+        @sys.OSError(code, ..) => {
           host.async_errno = code
           self.runtime.handles.null_handle
         }
@@ -354,7 +354,7 @@ fn Context::process_import(
     "process/open_pid_handle" => {
       let pid = i32(args[0])
       let handle = self.runtime.process.open_pid_handle(pid) catch {
-        @os_error.OSError(code, ..) => {
+        @sys.OSError(code, ..) => {
           host.async_errno = code
           return [I64(self.runtime.handles.invalid_fd)]
         }
@@ -396,7 +396,7 @@ fn Context::process_import(
       }
       guard (
           handle == self.runtime.handles.invalid_fd &&
-          !(@async.platform is Windows)
+          !(@sys.platform is Windows)
         ) ||
         (
           self.runtime.process.process_handles.get(handle)
@@ -417,7 +417,7 @@ fn Context::process_import(
       let pid = i32(args[1])
       let handle = i64(args[0])
       let status = Some(self.runtime.process.get_result(handle, pid)) catch {
-        @os_error.OSError(code, ..) => {
+        @sys.OSError(code, ..) => {
           host.async_errno = code
           None
         }
@@ -433,10 +433,8 @@ fn Context::process_import(
     "process/kill" | "process/terminate" => {
       let pid = i32(args[0])
       let signal = if name == "process/kill" { -1 } else { i32(args[1]) }
-      self.suspend(() => {
-        self.runtime.process.signal(pid, signal)
-        []
-      })
+      self.runtime.process.signal(pid, signal)
+      []
     }
     "event_bus/register_pid" => {
       guard host.buses.get(i64(args[0])) is Some(bus) else {
@@ -446,7 +444,7 @@ fn Context::process_import(
       let child = self.runtime.process.children.get(i32(args[1]))
       if self.runtime.policy is Some(_) &&
         !(child is Some(child) && !child.consumed) {
-        host.async_errno = if @async.platform is Windows { 5 } else { 13 }
+        host.async_errno = if @sys.platform is Windows { 5 } else { 13 }
         return [I32(-1)]
       }
       if child is Some(child) && child.result is Some(_) {
@@ -454,7 +452,7 @@ fn Context::process_import(
       }
       let result = @sys.register_child_pid(bus.native, i32(args[1]))
       if result < 0 {
-        host.async_errno = @os_error.get_errno()
+        host.async_errno = @sys.get_errno()
       }
       [I32(result)]
     }

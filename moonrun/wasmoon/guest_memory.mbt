@@ -27,7 +27,7 @@ fn guest_string(
   let mut high = false
   for index in 0..<length {
     let unit = memory.load_i32_16u_at(address + index.to_int64() * 2L)
-    if !(@async.platform is Windows) {
+    if !(@sys.platform is Windows) {
       guard (if high {
         unit >= 0xDC00 && unit <= 0xDFFF
       } else {

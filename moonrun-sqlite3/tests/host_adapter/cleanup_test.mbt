@@ -1,5 +1,5 @@
 ///|
-async test "cleanup jobs finalize statements and close databases off thread" {
+test "cleanup jobs finalize statements and close databases off thread" {
   let code = Ref(0)
   let executor = @ffi.sqlite3_executor_create(code)
   assert_eq(code.val, 0)
@@ -21,7 +21,7 @@ async test "cleanup jobs finalize statements and close databases off thread" {
 }
 
 ///|
-async test "a rejected finalizer leaves its statement with the caller" {
+test "a rejected finalizer leaves its statement with the caller" {
   let code = Ref(0)
   let executor = @ffi.sqlite3_executor_create(code)
   assert_eq(code.val, 0)

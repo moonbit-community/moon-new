@@ -178,22 +178,21 @@ pub fn Job::close(self : Job) -> Unit {
 }
 
 ///|
-pub async fn Job::run(self : Job) -> @resource.JobResult {
+pub fn Job::prepare(self : Job) -> @resource.Task raise {
   guard !self.closed && self.input is Some(input) else { raise Fault }
-  // A native operation and its owned result must survive cancellation together.
-  @async.protect_from_cancel(() => {
-    self.input = None
-    self.result = Some(
-      match input {
-        Open(filesystem, filename, flags) =>
-          open_job(filesystem, filename, flags)
-        Prepare(database, sql) => prepare_job(database, sql)
-        Step(statement) => step_job(statement)
-        Finalize(statement) => cleanup_job(statement.database, Some(statement))
-        Close(database) => cleanup_job(database, None)
-      },
-    )
-  })
-  let result = self.outcome()
-  { ret: result.code, errno: 0, data: b"", opened: None, }
+  let complete = fn(result : Outcome) -> @resource.JobResult {
+    self.result = Some(result)
+    { ret: result.code, errno: 0, data: b"", opened: None, }
+  }
+  let task = match input {
+    Open(filesystem, filename, flags) =>
+      open_job(filesystem, filename, flags, complete)
+    Prepare(database, sql) => prepare_job(database, sql, complete)
+    Step(statement) => step_job(statement, complete)
+    Finalize(statement) =>
+      cleanup_job(statement.database, Some(statement), complete)
+    Close(database) => cleanup_job(database, None, complete)
+  }
+  self.input = None
+  task
 }

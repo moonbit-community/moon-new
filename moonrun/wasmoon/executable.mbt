@@ -1,26 +1,32 @@
 ///|
-pub async fn Context::execute(
+pub fn Context::execute(
   self : Context,
   linker : @vm.Linker,
   code : @wasm.Module,
   selection : Array[(String, Array[(UInt32, UInt32)])]?,
-) -> @termination.RunOutcome {
+  stack_size~ : Int64 = 16L * 1024L * 1024L,
+  no_stack_trace~ : Bool = false,
+) -> @termination.RunOutcome raise {
   let imports = self.register(linker, code)
   let store = linker.get_store()
   // Run start functions through the same cooperative driver as exported entries.
   let instance = @executor.instantiate_module_with_imports_unstarted(
     store, code, imports,
   )
+  let jit = prepare_jit(code, store, instance, stack_size)
+  defer jit.close()
+  jit.install_hostcall_dispatcher(store, instance)
   let outcome : @termination.RunOutcome = try {
     if code.start is Some(index) {
-      self.call(store, instance, index, []) |> ignore
+      self.call(jit, store, instance, index, []) |> ignore
     }
     match selection {
-      Some(selection) => self.run_tests(store, instance, selection)
+      Some(selection) =>
+        self.run_tests(jit, store, instance, selection, no_stack_trace)
       None =>
         for entry in instance.exports {
           if entry.name == "_start" && entry.desc is Func(index) {
-            self.call(store, instance, index, []) |> ignore
+            self.call(jit, store, instance, index, []) |> ignore
             break
           }
         }
@@ -43,9 +49,7 @@ pub async fn Context::execute(
       }
       match exit {
         Some(code) => Exited(code)
-        // FIXME: Attach owned guest frames when Wasmoon exposes trap context:
-        // https://github.com/Milky2018/wasmoon/issues/547
-        None => Trapped("\{error}")
+        None => Trapped(format_trap(error, jit, no_stack_trace))
       }
     }
   }
@@ -57,75 +61,42 @@ pub async fn Context::execute(
 }
 
 ///|
-// The published Wasmoon continuation API retries a suspended host call.
-// Keep its result until that retry so side effects execute exactly once.
-fn Context::suspend(
+fn Context::call(
   self : Context,
-  action : async () -> Array[@wasm.Value],
-) -> Array[@wasm.Value] raise {
-  if self.ready is Some(result) {
-    self.ready = None
-    return result
-  }
-  self.pending = Some(action)
-  raise @vm.AsyncHostCallInProgress
-}
-
-///|
-async fn Context::call(
-  self : Context,
+  jit : @jit_context.JITModuleContext,
   store : @vm.Store,
   instance : @vm.ModuleInstance,
   index : Int32,
   args : Array[@wasm.Value],
-) -> Array[@wasm.Value] {
+) -> Array[@wasm.Value] raise {
   let mut yielded_at = @wasi.native_clock_gettime_monotonic()
-  let mut outcome = @executor.call_func_by_index_resumable(
-    store,
-    instance,
-    index,
-    args,
-    fn(error) {
-      if error == @vm.AsyncHostCallInProgress && self.pending is Some(_) {
-        Some(1L)
-      } else {
-        None
-      }
-    },
-    cooperative=true,
-  )
+  let mut outcome = jit.call_core_func_resumable(store, instance, index, args) catch {
+    @jit_context.Exit(code) => raise @vm.HostExit(code)
+    @jit_context.HostInvocation(error) => raise error
+    error => raise error
+  }
   for ;; {
     match outcome {
-      Returned(values) => return values
-      Suspended(reason, continuation) => {
+      NativeCoreReturned(values) => return values
+      NativeCoreSuspended(reason, continuation) => {
         errdefer continuation.cancel()
         match reason {
           CooperativeYield =>
-            // Bound guest CPU slices while avoiding an event-loop turn for
-            // every 1,024-instruction Wasmoon continuation.
             if @wasi.native_clock_gettime_monotonic() - yielded_at >= 1000000L {
-              @async.sleep(0)
+              self.progress()
               yielded_at = @wasi.native_clock_gettime_monotonic()
             }
-          HostCall(1L) => {
-            guard self.pending is Some(action) else {
-              raise @vm.UnhandledSuspension
-            }
-            self.pending = None
-            self.ready = Some(
-              action() catch {
-                @sys.Invalid => raise @vm.TypeMismatch
-                @sys.Bounds => raise @vm.OutOfBoundsMemoryAccess
-                @sys.Operation(message) => raise @vm.LinkErrorDetail(message)
-                error => raise error
-              },
-            )
-            yielded_at = @wasi.native_clock_gettime_monotonic()
+          HostCall => raise @vm.UnhandledSuspension
+          AtomicWait => {
+            self.progress()
+            @sys.sleep(1)
           }
-          AtomicWait => @async.sleep(1)
-          _ => raise @vm.UnhandledSuspension
         }
-        outcome = continuation.continue_execution()
+        outcome = continuation.continue_execution() catch {
+          @jit_context.Exit(code) => raise @vm.HostExit(code)
+          @jit_context.HostInvocation(error) => raise error
+          error => raise error
+        }
       }
     }
   }

@@ -1,10 +1,12 @@
 ///|
-async fn Context::run_tests(
+fn Context::run_tests(
   self : Context,
+  jit : @jit_context.JITModuleContext,
   store : @vm.Store,
   instance : @vm.ModuleInstance,
   selected : Array[(String, Array[(UInt32, UInt32)])],
-) -> Unit {
+  no_stack_trace : Bool,
+) -> Unit raise {
   let mut execute = None
   let mut finish = None
   for entry in instance.exports {
@@ -24,7 +26,7 @@ async fn Context::run_tests(
     for (start, end) in ranges {
       for index = start; index < end; index = index + 1U {
         ignore(
-          self.call(store, instance, execute, [
+          self.call(jit, store, instance, execute, [
             self.put(Text(name)),
             I32(index.reinterpret_as_int()),
           ]),
@@ -35,7 +37,7 @@ async fn Context::run_tests(
               "type": "result",
               "file": name,
               "index": index,
-              "message": "\{error}",
+              "message": format_trap(error, jit, no_stack_trace),
             }
             self.runtime.stdio.output(
               1,
@@ -48,5 +50,5 @@ async fn Context::run_tests(
       }
     }
   }
-  self.call(store, instance, finish, []) |> ignore
+  self.call(jit, store, instance, finish, []) |> ignore
 }

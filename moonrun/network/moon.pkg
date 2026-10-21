@@ -1,6 +1,5 @@
 import {
   "moonbit-community/moonrun/async_sys/jobs" @native_jobs,
-  "moonbitlang/async/os_error",
   "moonbit-community/moonrun/policy",
   "moonbit-community/moonrun/resource",
   "moonbit-community/moonrun/runtime/stdio",

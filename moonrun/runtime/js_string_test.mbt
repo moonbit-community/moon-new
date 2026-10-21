@@ -1,7 +1,7 @@
 // Compatibility regressions; original probes from moon/crates/moonrun/tests at 12e9d22e.
 
 ///|
-async test "engine backends support js string builtins" {
+test "engine backends support js string builtins" {
   let source =
     #|(module
     #|                    (type $chars (array (mut i16)))

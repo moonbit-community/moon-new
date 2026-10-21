@@ -10,7 +10,7 @@ fn test_host() -> @sqlite.HostSqlite {
 }
 
 ///|
-async test "jobs pin databases and statements until their handles are released" {
+test "jobs pin databases and statements until their handles are released" {
   let host = test_host()
   defer host.close()
   let (code, database) = host.open_v2(b":memory:", 6, host.handles.null_handle)
@@ -22,7 +22,7 @@ async test "jobs pin databases and statements until their handles are released" 
   } noraise {
     _ => fail("closed a pinned database")
   }
-  assert_eq(prepare.run().ret, 0)
+  assert_eq(prepare.prepare().run().ret, 0)
   let statement = host.take_job_handle(prepare)
   try host.take_job_handle(prepare) catch {
     @sqlite.Fault => ()
@@ -38,7 +38,7 @@ async test "jobs pin databases and statements until their handles are released" 
   } noraise {
     _ => fail("finalized a pinned statement")
   }
-  assert_eq(step.run().ret, 100)
+  assert_eq(step.prepare().run().ret, 100)
   try host.column_int64(statement, 0) catch {
     @sqlite.Fault => ()
     error => raise error
@@ -60,12 +60,12 @@ async test "jobs pin databases and statements until their handles are released" 
 }
 
 ///|
-async test "discard retains a prepare lease after the source job is freed" {
+test "discard retains a prepare lease after the source job is freed" {
   let host = test_host()
   defer host.close()
   let (_, database) = host.open_v2(b":memory:", 6, host.handles.null_handle)
   let prepare = host.make_prepare_job(database, "SELECT 1")
-  assert_eq(prepare.run().ret, 0)
+  assert_eq(prepare.prepare().run().ret, 0)
   guard prepare.discard() is Some(discard) else { fail("missing discard job") }
   assert_true(prepare.discard() is None)
   prepare.close()
@@ -75,13 +75,13 @@ async test "discard retains a prepare lease after the source job is freed" {
   } noraise {
     _ => fail("discard lost its database lease")
   }
-  assert_eq(discard.run().ret, 0)
+  assert_eq(discard.prepare().run().ret, 0)
   discard.close()
   assert_eq(host.close_database(database), 0)
 }
 
 ///|
-async test "invalid finalizers preserve the original statement and database" {
+test "invalid finalizers preserve the original statement and database" {
   let host = test_host()
   defer host.close()
   let (_, database) = host.open_v2(b":memory:", 6, host.handles.null_handle)
@@ -100,7 +100,7 @@ async test "invalid finalizers preserve the original statement and database" {
 }
 
 ///|
-async test "busy statements keep their text and blob bindings until reset" {
+test "busy statements keep their text and blob bindings until reset" {
   let host = test_host()
   defer host.close()
   let (_, database) = host.open_v2(b":memory:", 6, host.handles.null_handle)
@@ -120,7 +120,7 @@ async test "busy statements keep their text and blob bindings until reset" {
 }
 
 ///|
-async test "bundled SQLite version and default foreign keys match moonrun" {
+test "bundled SQLite version and default foreign keys match moonrun" {
   let host = test_host()
   defer host.close()
   let (_, database) = host.open_v2(b":memory:", 6, host.handles.null_handle)

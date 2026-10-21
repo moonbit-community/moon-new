@@ -1,9 +1,9 @@
 ///|
-pub async fn Stdio::deny(
+pub fn Stdio::deny(
   self : Stdio,
   action : String,
   target~ : String = "",
-) -> Unit {
+) -> Unit raise {
   self.output(
     2,
     @utf8.encode(
@@ -12,8 +12,8 @@ pub async fn Stdio::deny(
       "\n",
     ),
   )
-  raise @os_error.OSError(
-    if @async.platform is Windows {
+  raise @sys.OSError(
+    if @sys.platform is Windows {
       5
     } else {
       13

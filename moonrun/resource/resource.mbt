@@ -1,8 +1,8 @@
 ///|
 pub(all) enum ResourceKind {
-  Pipe(@raw_fd.RawFd, Bool)
-  File(@fs.File)
-  Standard(Int32, @types.Fd)
+  Pipe(@sys.Fd, Bool)
+  File(@sys.File)
+  Standard(Int32, @sys.Fd)
   Socket(Socket)
   Watcher(Watcher)
 }
@@ -13,10 +13,6 @@ pub(all) enum ResourceKind {
 pub(all) struct Resource {
   owner : ResourceKind
   priv mut references : Int32
-  read_lock : @async.Mutex
-  write_lock : @async.Mutex
-  cursor_lock : @async.Mutex
-  mut cursor : Int64
   append : Bool
   guest_async : Bool
   mut path : String?
@@ -29,23 +25,13 @@ pub fn Resource::Resource(
   guest_async~ : Bool = true,
   path? : String,
 ) -> Resource {
-  {
-    owner,
-    references: 1,
-    read_lock: @async.Mutex(),
-    write_lock: @async.Mutex(),
-    cursor_lock: @async.Mutex(),
-    cursor: 0L,
-    append,
-    guest_async,
-    path,
-  }
+  { owner, references: 1, append, guest_async, path, }
 }
 
 ///|
-pub fn Resource::native(self : Resource) -> @types.Fd {
+pub fn Resource::native(self : Resource) -> @sys.Fd {
   match self.owner {
-    Pipe(pipe, _) => pipe.fd
+    Pipe(pipe, _) => pipe
     File(file) => file.fd()
     Standard(_, fd) => fd
     Socket(socket) => socket.fd
@@ -63,7 +49,7 @@ pub fn Resource::release(self : Resource) -> Unit {
   self.references -= 1
   if self.references == 0 {
     match self.owner {
-      Pipe(pipe, _) => pipe.close()
+      Pipe(pipe, _) => ignore(@sys.close_guest_pipe(pipe))
       File(file) => file.close()
       Standard(_, _) => ()
       Socket(socket) => socket.close()

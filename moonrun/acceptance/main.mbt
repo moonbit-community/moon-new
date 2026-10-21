@@ -34,9 +34,19 @@ async fn main {
   }
   if @env.args().get(2) == Some("process-exit") {
     let output : Array[Byte] = []
-    let result = @async.with_timeout(1500, () => {
-      program.run(stdout=bytes => output.push_iter(bytes.iter()), stderr=_ => ())
+    let deadline = @async.now() + 1500L
+    let control = @runtime.RunControl(poll=() => {
+      if @async.now() >= deadline {
+        Some(@signal.Signal::SIGINT.to_int())
+      } else {
+        None
+      }
     })
+    let result = program.run(
+      control~,
+      stdout=bytes => output.push_iter(bytes.iter()),
+      stderr=_ => (),
+    )
     assert_eq(result, Completed)
     assert_eq(
       Bytes::from_array(output),
@@ -136,7 +146,8 @@ async fn main {
       },
     )
   }
-  @async.all([run, run]) |> ignore
+  run()
+  run()
   println(
     if process {
       "embedded async process passed"
@@ -151,30 +162,26 @@ async fn main {
 ///|
 async fn check_cancellation(program : @runtime.Module) -> Unit {
   let output : Array[Byte] = []
-  let started = @cond_var.Cond()
-  @async.with_timeout(10_000, () => {
-    @async.with_task_group(group => {
-      let run = group.spawn(() => {
-        program.run(stdout=bytes => {
-          output.push_iter(bytes.iter())
-          started.signal()
-        })
-      })
-      while !output.contains(b'\n') {
-        started.wait()
-      }
-      // Allow the guest to enter its pending accept before cancelling it.
-      @async.sleep(20)
-      run.cancel()
-      try {
-        ignore(run.wait())
-        raise Failure("guest returned before cancellation")
-      } catch {
-        @async.WaitedTaskAlreadyCancelled => ()
-        error => raise error
-      }
-    })
+  let deadline = Ref(0L)
+  let sent = Ref(false)
+  let control = @runtime.RunControl(poll=() => {
+    if deadline.val > 0L && @async.now() >= deadline.val && !sent.val {
+      sent.val = true
+      Some(@signal.Signal::SIGINT.to_int())
+    } else {
+      None
+    }
   })
+  assert_eq(
+    program.run(control~, stdout=bytes => {
+      output.push_iter(bytes.iter())
+      if deadline.val == 0L && output.contains(b'\n') {
+        deadline.val = @async.now() + 20L
+      }
+    }),
+    Signaled(@signal.Signal::SIGINT.to_int()),
+  )
+  assert_true(sent.val)
   let address = @socket.Addr::parse(
     @utf8.decode(Bytes::from_array(output)).trim().to_owned(),
   )

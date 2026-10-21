@@ -1,22 +1,19 @@
 ///|
-pub async fn read_directory(
+pub fn read_directory(
   fd : @resource.Resource,
   buffer : FixedArray[Byte],
   length : Int32,
   restart : Bool,
-) -> @resource.JobResult {
-  fd.cursor_lock.acquire()
-  defer fd.cursor_lock.release()
-  let result = @native_jobs.run_native_job(
-    ReadDirectory,
-    "",
-    fd.native(),
-    0,
-    length,
-    restart,
-  )
-  if result.ret >= 0 {
-    result.data.to_fixedarray().blit_to(buffer, len=length)
+) -> @resource.Task raise {
+  let operation = match fd.owner {
+    File(file) => file.prepare_directory(length, restart)
+    _ => @sys.directory_job(fd.native(), length, restart)
   }
-  result
+  @resource.Task(operation, publish=() => {
+    let result = @resource.result(operation)
+    if result.ret >= 0 {
+      result.data.to_fixedarray().blit_to(buffer, len=length)
+    }
+    result
+  })
 }

@@ -1,8 +1,8 @@
 ///|
-async test "legacy inline jobs expose size kind identity and timestamp records" {
-  let directory = @fs.tmpdir(prefix="moonrun-legacy-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
-  @fs.write_file(directory + "/file", b"abc")
+test "legacy inline jobs expose size kind identity and timestamp records" {
+  let directory = @sys.tmpdir(prefix="moonrun-legacy-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
+  @sys.write_file(directory + "/file", b"abc")
   let source =
     #|(module
     #| (import "moonbitlang/async" "thread_pool/make_open_job" (func $open (param i32 i32 i32 i32 i32 i32 i32) (result i64)))
@@ -39,7 +39,7 @@ async test "legacy inline jobs expose size kind identity and timestamp records" 
 }
 
 ///|
-async test "legacy completion pipes retain their writer after guest handle close" {
+test "legacy completion pipes retain their writer after guest handle close" {
   let source =
     #|(module
     #| (import "moonbitlang/async" "fd_util/pipe" (func $pipe (param i32 i32 i32 i32) (result i32)))
@@ -61,13 +61,13 @@ async test "legacy completion pipes retain their writer after guest handle close
     #|   i32.const 0 i64.load i32.const 64 i32.const 0 i32.const 4 call $read i32.const 4 i32.ne if unreachable end
     #|   i32.const 64 i32.load i32.const 4660 i32.ne if unreachable end
     #|   local.get $worker call $free))
-  if !(@async.platform is Windows) {
+  if !(@sys.platform is Windows) {
     assert_eq(compile(source).run(), Completed)
   }
 }
 
 ///|
-async test "legacy sigwait receives only signals forwarded to its own run" {
+test "legacy sigwait receives only signals forwarded to its own run" {
   let source =
     #|(module
     #| (import "moonbitlang/async" "thread_pool/make_sigwait_job" (func $signal (param i32 i32) (result i64)))
@@ -81,22 +81,23 @@ async test "legacy sigwait receives only signals forwarded to its own run" {
     #|   i32.const 42 call $print
     #|   local.get $job call $run
     #|   local.get $job call $ret i32.const 15 i32.ne if unreachable end))
-  let control = @runtime.RunControl()
   let started = Ref(false)
-  let ready = @cond_var.Cond()
-  @async.with_timeout(1000, () => {
-    @async.with_task_group(group => {
-      let task = group.spawn(() => {
-        compile(source).run(control~, stdout=_ => {
-          started.val = true
-          ready.signal()
-        })
-      })
-      while !started.val {
-        ready.wait()
-      }
-      assert_true(control.send_signal(15))
-      assert_eq(task.wait(), Completed)
-    })
+  let deadline = Ref(0L)
+  let sent = Ref(false)
+  let control = @runtime.RunControl(poll=() => {
+    if started.val && !sent.val && @sys.now() >= deadline.val {
+      sent.val = true
+      Some(15)
+    } else {
+      None
+    }
   })
+  assert_eq(
+    compile(source).run(control~, stdout=_ => {
+      started.val = true
+      deadline.val = @sys.now() + 10L
+    }),
+    Completed,
+  )
+  assert_true(sent.val)
 }

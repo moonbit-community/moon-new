@@ -1,7 +1,7 @@
 // Compatibility regressions; original probes from moon/crates/moonrun/tests at 12e9d22e.
 
 ///|
-async test "byte builders copy on finish and readers observe mutation" {
+test "byte builders copy on finish and readers observe mutation" {
   let source =
     #|(module
     #|        (import "__moonbit_fs_unstable" "begin_create_byte_array" (func $builder (result externref)))
@@ -34,7 +34,7 @@ async test "byte builders copy on finish and readers observe mutation" {
 }
 
 ///|
-async test "byte operations preserve overlap clamping and utf16" {
+test "byte operations preserve overlap clamping and utf16" {
   let source =
     #|(module
     #|        (import "ffi-bytes" "memory" (memory 1))
@@ -79,7 +79,7 @@ async test "byte operations preserve overlap clamping and utf16" {
 }
 
 ///|
-async test "fractional slice indices truncate before relative clamping" {
+test "fractional slice indices truncate before relative clamping" {
   let source =
     #|(module
     #|        (import "ffi-bytes" "memory" (memory 1))
@@ -99,7 +99,7 @@ async test "fractional slice indices truncate before relative clamping" {
 }
 
 ///|
-async test "byte memory is reacquired after growth and copies are independent" {
+test "byte memory is reacquired after growth and copies are independent" {
   let source =
     #|(module
     #|        (import "ffi-bytes" "memory" (memory 1))

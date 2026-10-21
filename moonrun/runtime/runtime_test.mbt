@@ -25,62 +25,57 @@ fn waiting_guest(timeout : Int32) -> @runtime.Module raise {
 }
 
 ///|
-async test "guest event wait participates in an already running async loop" {
-  let program = waiting_guest(100)
-  let ticked = Ref(false)
-  let finished = Ref(false)
-  let started = Ref(false)
-  let ready = @cond_var.Cond()
-  @async.with_task_group(group => {
-    group.spawn_bg(() => {
-      while !started.val {
-        ready.wait()
-      }
-      @async.sleep(10)
-      assert_false(finished.val)
-      ticked.val = true
-    })
-    assert_eq(
-      program.run(stdout=bytes => {
-        if bytes == b"*" {
-          started.val = true
-          ready.signal()
-        } else {
-          finished.val = true
+async test "synchronous guest can run inside an existing async loop" {
+  @async.sleep(0)
+  assert_eq(waiting_guest(10).run(stdout=_ => ()), Completed)
+  @async.sleep(0)
+}
+
+///|
+test "nested guests have independent event buses" {
+  let first = waiting_guest(10)
+  let second = waiting_guest(5)
+  let nested = Ref(false)
+  assert_eq(
+    first.run(stdout=bytes => {
+      if bytes == b"*" {
+        assert_eq(second.run(stdout=_ => ()), Completed) catch {
+          error => abort("\{error}")
         }
-      }),
-      Completed,
-    )
-    assert_true(ticked.val)
+        nested.val = true
+      }
+    }),
+    Completed,
+  )
+  assert_true(nested.val)
+}
+
+///|
+fn cancel_after(milliseconds : Int32) -> @runtime.RunControl {
+  let deadline = @sys.now() + milliseconds.to_int64()
+  @runtime.RunControl(poll=() => {
+    if @sys.now() >= deadline {
+      Some(15)
+    } else {
+      None
+    }
   })
 }
 
 ///|
-async test "concurrent guests have independent event buses" {
-  let first = waiting_guest(10)
-  let second = waiting_guest(30)
-  assert_eq(
-    @async.all([
-      () => first.run(stdout=_ => ()),
-      () => second.run(stdout=_ => ()),
-    ]),
-    [Completed, Completed],
-  )
-}
-
-///|
-async test "an infinite guest event wait is cancellable and releases its worker" {
+test "an infinite guest event wait is cancellable and releases its bus" {
   let program = waiting_guest(-1)
   for _ in 0..<3 {
-    assert_true(
-      @async.with_timeout_opt(10, () => program.run(stdout=_ => ())) is None,
+    assert_eq(
+      program.run(control=cancel_after(10), stdout=_ => ()),
+      Signaled(15),
     )
   }
   assert_eq(waiting_guest(0).run(stdout=_ => ()), Completed)
 }
 
 ///|
-async test "a reused event bus remains cancellable after completed waits" {
+test "a reused event bus remains cancellable after completed waits" {
   let program = compile(
     (
       #|(module
@@ -101,17 +96,22 @@ async test "a reused event bus remains cancellable after completed waits" {
     ),
   )
   let finished_waits = Ref(false)
-  assert_true(
-    @async.with_timeout_opt(500, () => {
-      program.run(stdout=_ => finished_waits.val = true)
-    })
-    is None,
+  let control = @runtime.RunControl(poll=() => {
+    if finished_waits.val {
+      Some(15)
+    } else {
+      None
+    }
+  })
+  assert_eq(
+    program.run(control~, stdout=_ => finished_waits.val = true),
+    Signaled(15),
   )
   assert_true(finished_waits.val)
 }
 
 ///|
-async test "guest pipe handles are owned and closed without exposing native pointers" {
+test "guest pipe handles are owned and closed without exposing native pointers" {
   let program = compile(
     (
       #|(module
@@ -130,7 +130,7 @@ async test "guest pipe handles are owned and closed without exposing native poin
 }
 
 ///|
-async test "pipe ABI faults and closed handles return errno without terminating the guest" {
+test "pipe ABI faults and closed handles return errno without terminating the guest" {
   let program = compile(
     (
       #|(module
@@ -171,19 +171,19 @@ async test "pipe ABI faults and closed handles return errno without terminating 
     )
     .replace_all(
       old="FAULT",
-      new=if @async.platform is Windows { "487" } else { "14" },
+      new=if @sys.platform is Windows { "487" } else { "14" },
     )
     .replace_all(
       old="BADF",
-      new=if @async.platform is Windows { "6" } else { "9" },
+      new=if @sys.platform is Windows { "6" } else { "9" },
     ),
   )
   assert_eq(program.run(), Completed)
 }
 
 ///|
-async test "guest Unix pipe readiness survives memory growth and concurrent runs" {
-  if @async.platform is Windows {
+test "guest Unix pipe readiness survives memory growth and repeated runs" {
+  if @sys.platform is Windows {
     return
   }
   let program = compile(
@@ -228,14 +228,11 @@ async test "guest Unix pipe readiness survives memory growth and concurrent runs
       #|   local.get $bus call $destroy))
     ),
   )
-  assert_eq(@async.all([() => program.run(), () => program.run()]), [
-    Completed,
-    Completed,
-  ])
+  assert_eq([program.run(), program.run()], [Completed, Completed])
 }
 
 ///|
-async test "start sections, _start and UTF-16 output" {
+test "start sections, _start and UTF-16 output" {
   let program = compile(
     (
       #|(module
@@ -257,7 +254,7 @@ async test "start sections, _start and UTF-16 output" {
 }
 
 ///|
-async test "guest exit does not exit or poison the embedding host" {
+test "guest exit does not exit or poison the embedding host" {
   let program = compile(
     (
       #|(module
@@ -271,7 +268,7 @@ async test "guest exit does not exit or poison the embedding host" {
 }
 
 ///|
-async test "guest trap is returned separately from host setup errors" {
+test "guest trap is returned separately from host setup errors" {
   let program = compile("(module (func (export \"_start\") unreachable))")
   assert_true(program.run() is Trapped(_))
   let missing = compile("(module (import \"unknown\" \"function\" (func)))")
@@ -285,7 +282,7 @@ async test "guest trap is returned separately from host setup errors" {
 }
 
 ///|
-async test "nonconforming host signatures fail before execution" {
+test "nonconforming host signatures fail before execution" {
   let program = compile(
     (
       #|(module
@@ -302,16 +299,16 @@ async test "nonconforming host signatures fail before execution" {
 }
 
 ///|
-async test "CPU-bound guest yields and can be cancelled" {
+test "CPU-bound guest yields and can be cancelled" {
   let program = compile("(module (func (export \"_start\") (loop br 0)))")
-  assert_true(@async.with_timeout_opt(20, () => program.run()) is None)
+  assert_eq(program.run(control=cancel_after(20)), Signaled(15))
   assert_eq(compile("(module)").run(), Completed)
 }
 
 ///|
-async test "filesystem imports suspend without repeating side effects" {
-  let directory = @fs.tmpdir(prefix="moonrun-test-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
+test "synchronous filesystem imports execute side effects once" {
+  let directory = @sys.tmpdir(prefix="moonrun-test-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
   let program = compile(
     (
       #|(module
@@ -326,11 +323,11 @@ async test "filesystem imports suspend without repeating side effects" {
     ),
   )
   assert_eq(program.run(cwd=directory), Completed)
-  assert_true(@fs.kind(directory + "/nested") is Directory)
+  assert_true(@sys.kind(directory + "/nested") is Directory)
 }
 
 ///|
-async test "environment changes are isolated to each run" {
+test "environment changes are isolated to each run" {
   let program = compile(
     (
       #|(module
@@ -351,7 +348,7 @@ async test "environment changes are isolated to each run" {
 }
 
 ///|
-async test "guest exception imports preserve Wasm catch semantics" {
+test "guest exception imports preserve Wasm catch semantics" {
   let program = compile(
     (
       #|(module
@@ -367,7 +364,7 @@ async test "guest exception imports preserve Wasm catch semantics" {
 }
 
 ///|
-async test "stdin decodes split UTF-8 and preserves remaining binary input" {
+test "stdin decodes split UTF-8 and preserves remaining binary input" {
   let program = compile(
     (
       #|(module
@@ -392,7 +389,7 @@ async test "stdin decodes split UTF-8 and preserves remaining binary input" {
 }
 
 ///|
-async test "ffi-bytes copy preserves overlapping source and checks bounds" {
+test "ffi-bytes copy preserves overlapping source and checks bounds" {
   let program = compile(
     (
       #|(module
@@ -421,7 +418,7 @@ async test "ffi-bytes copy preserves overlapping source and checks bounds" {
 }
 
 ///|
-async test "JS strings use UTF-16 code units and guest i16 arrays" {
+test "JS strings use UTF-16 code units and guest i16 arrays" {
   let program = compile(
     (
       #|(module
@@ -440,7 +437,7 @@ async test "JS strings use UTF-16 code units and guest i16 arrays" {
 }
 
 ///|
-async test "WASI output and proc_exit are isolated per run" {
+test "WASI output and proc_exit are isolated per run" {
   let program = compile(
     (
       #|(module
@@ -464,7 +461,7 @@ async test "WASI output and proc_exit are isolated per run" {
 }
 
 ///|
-async test "invalid test selections fail before guest start side effects" {
+test "invalid test selections fail before guest start side effects" {
   let program = compile(
     (
       #|(module
@@ -485,7 +482,7 @@ async test "invalid test selections fail before guest start side effects" {
 }
 
 ///|
-async test "core and WASI reads share prefetched standard input" {
+test "core and WASI reads share prefetched standard input" {
   let program = compile(
     (
       #|(module
@@ -518,12 +515,12 @@ async test "core and WASI reads share prefetched standard input" {
 }
 
 ///|
-async test "empty core filenames do not resolve to the working directory" {
-  let parent = @fs.tmpdir(prefix="moonrun-empty-path-")
-  defer @fs.rmdir(parent, recursive=true) |> ignore
+test "empty core filenames do not resolve to the working directory" {
+  let parent = @sys.tmpdir(prefix="moonrun-empty-path-")
+  defer @sys.rmdir(parent, recursive=true) |> ignore
   let directory = parent + "/work"
-  @fs.mkdir(directory)
-  @fs.write_file(directory + "/keep", b"keep")
+  @sys.mkdir(directory)
+  @sys.write_file(directory + "/keep", b"keep")
   let program = compile(
     (
       #|(module
@@ -534,20 +531,20 @@ async test "empty core filenames do not resolve to the working directory" {
     ),
   )
   assert_eq(program.run(cwd=directory), Completed)
-  assert_eq(@fs.read_file(directory + "/keep").binary(), b"keep")
+  assert_eq(@sys.read_file(directory + "/keep"), b"keep")
 }
 
 ///|
-async test "core filenames retain symlink and parent-directory semantics" {
-  if @async.platform is Windows {
+test "core filenames retain symlink and parent-directory semantics" {
+  if @sys.platform is Windows {
     return
   }
-  let directory = @fs.tmpdir(prefix="moonrun-symlink-path-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
-  @fs.mkdir(directory + "/target/child", recursive=true)
-  @fs.symlink(target=directory + "/target/child", directory + "/link")
-  @fs.write_file(directory + "/value", b"A")
-  @fs.write_file(directory + "/target/value", b"B")
+  let directory = @sys.tmpdir(prefix="moonrun-symlink-path-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
+  @sys.mkdir(directory + "/target/child", recursive=true)
+  @sys.symlink(target=directory + "/target/child", directory + "/link")
+  @sys.write_file(directory + "/value", b"A")
+  @sys.write_file(directory + "/target/value", b"B")
   let program = compile(
     (
       #|(module
@@ -563,7 +560,7 @@ async test "core filenames retain symlink and parent-directory semantics" {
 }
 
 ///|
-async test "core environment mutations are visible through WASI" {
+test "core environment mutations are visible through WASI" {
   let program = compile(
     (
       #|(module
@@ -589,12 +586,12 @@ async test "core environment mutations are visible through WASI" {
 }
 
 ///|
-async test "absolute core filenames override the run working directory" {
-  let directory = @fs.tmpdir(prefix="moonrun-absolute-path-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
-  @fs.mkdir(directory + "/work")
+test "absolute core filenames override the run working directory" {
+  let directory = @sys.tmpdir(prefix="moonrun-absolute-path-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
+  @sys.mkdir(directory + "/work")
   let path = directory + "/value"
-  @fs.write_file(path, b"B")
+  @sys.write_file(path, b"B")
   let program = compile(
     (
       #|(module
@@ -608,7 +605,7 @@ async test "absolute core filenames override the run working directory" {
     ),
   )
   assert_eq(program.run(args=[path], cwd=directory + "/work"), Completed)
-  if @async.platform is Windows && path is ['a'..<='z' | 'A'..<='Z', ':', ..] {
+  if @sys.platform is Windows && path is ['a'..<='z' | 'A'..<='Z', ':', ..] {
     assert_eq(
       program.run(args=[path[2:].to_owned()], cwd=directory + "/work"),
       Completed,
@@ -617,8 +614,8 @@ async test "absolute core filenames override the run working directory" {
 }
 
 ///|
-async test "Unix pipe endpoint modes preserve nonblocking and blocking operations" {
-  if @async.platform is Windows {
+test "Unix pipe endpoint modes preserve nonblocking and blocking operations" {
+  if @sys.platform is Windows {
     return
   }
   let source =

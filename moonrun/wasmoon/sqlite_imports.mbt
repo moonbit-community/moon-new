@@ -57,17 +57,13 @@ fn Context::sqlite_import(
     "sqlite3_null_handle" => [I64(self.runtime.handles.null_handle)]
     "sqlite3_open_v2" => {
       let (memory, output) = sqlite_range(caller, i32(args[2]), 8L)
-      if self.ready is None {
-        memory.store_i64_at(output, self.runtime.handles.null_handle)
-      }
+      memory.store_i64_at(output, self.runtime.handles.null_handle)
       let filename = sqlite_filename(caller, i32(args[0]), i32(args[1]))
       let flags = i32(args[3])
       let vfs = i64(args[4])
-      self.suspend(() => {
-        let (code, database) = host.open_v2(filename, flags, vfs)
-        memory.store_i64_at(output, database)
-        [I32(code)]
-      })
+      let (code, database) = host.open_v2(filename, flags, vfs)
+      memory.store_i64_at(output, database)
+      [I32(code)]
     }
     "sqlite3_errmsg16_length" => [I32(host.errmsg(i64(args[0])).length())]
     "sqlite3_errmsg16" =>

@@ -2,12 +2,15 @@
 /// Per-run signal delivery. Embedding applications retain ownership of OS
 /// signal handlers and can forward a signal to the active guest explicitly.
 pub struct RunControl {
+  priv poll : (() -> Int32?)?
   priv mut deliver : ((Int32) -> Bool raise)?
 }
 
 ///|
-pub fn RunControl::RunControl() -> RunControl {
-  { deliver: None, }
+/// Poll at guest execution checkpoints, including while waiting for host work.
+/// A returned signal is delivered to the guest, or terminates it if unhandled.
+pub fn RunControl::RunControl(poll? : () -> Int32?) -> RunControl {
+  { deliver: None, poll, }
 }
 
 ///|

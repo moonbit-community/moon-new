@@ -1,5 +1,5 @@
 ///|
-async test "async host buffers survive guest memory growth" {
+test "async host buffers survive guest memory growth" {
   let program = compile(
     (
       #|(module
@@ -24,7 +24,7 @@ async test "async host buffers survive guest memory growth" {
 }
 
 ///|
-async test "freed async buffers remain invalid after another allocation" {
+test "freed async buffers remain invalid after another allocation" {
   let program = compile(
     (
       #|(module
@@ -43,7 +43,7 @@ async test "freed async buffers remain invalid after another allocation" {
 }
 
 ///|
-async test "async buffer byte access and null-terminated length" {
+test "async buffer byte access and null-terminated length" {
   let program = compile(
     (
       #|(module
@@ -73,7 +73,7 @@ async test "async buffer byte access and null-terminated length" {
 }
 
 ///|
-async test "socket addresses preserve IPv4, IPv6 and scope fields" {
+test "socket addresses preserve IPv4, IPv6 and scope fields" {
   let source =
     #|(module
     #| (import "moonbitlang/async" "socket/ipv4_addr_size" (func $size4 (result i32)))
@@ -103,8 +103,8 @@ async test "socket addresses preserve IPv4, IPv6 and scope fields" {
 }
 
 ///|
-async test "interface lookup copies borrowed native names" {
-  if @async.platform is Windows {
+test "interface lookup copies borrowed native names" {
+  if @sys.platform is Windows {
     return
   }
   let source =
@@ -126,22 +126,18 @@ async test "interface lookup copies borrowed native names" {
   let source = source
     .replace_all(
       old="LENGTH",
-      new=if @async.platform is MacOS { "3" } else { "2" },
+      new=if @sys.platform is MacOS { "3" } else { "2" },
     )
     .replace(
       old="NAME",
-      new=if @async.platform is MacOS {
-        "l\\00o\\000\\00"
-      } else {
-        "l\\00o\\00"
-      },
+      new=if @sys.platform is MacOS { "l\\00o\\000\\00" } else { "l\\00o\\00" },
     )
   assert_eq(compile(source).run(), Completed)
 }
 
 ///|
-async test "socket syscalls return EFAULT for invalid guest buffers" {
-  if @async.platform is Windows {
+test "socket syscalls return EFAULT for invalid guest buffers" {
+  if @sys.platform is Windows {
     return
   }
   let source =
@@ -166,8 +162,8 @@ async test "socket syscalls return EFAULT for invalid guest buffers" {
 }
 
 ///|
-async test "Windows accept rejects closed and already reserved target handles" {
-  if !(@async.platform is Windows) {
+test "Windows accept rejects closed and already reserved target handles" {
+  if !(@sys.platform is Windows) {
     return
   }
   let source =

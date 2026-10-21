@@ -3,7 +3,6 @@ pub struct HostProcess {
   priv policy : @policy.Policy?
   priv stdio : @stdio.Stdio
   priv handles : @handles.Handles
-  priv group : @async.TaskGroup[@termination.RunOutcome]
   process_env : Map[Int64, Environment]
   process_args : Map[Int64, Array[String?]]
   children : Map[Int32, Child]
@@ -16,13 +15,11 @@ pub fn HostProcess::HostProcess(
   policy : @policy.Policy?,
   stdio : @stdio.Stdio,
   handles : @handles.Handles,
-  group : @async.TaskGroup[@termination.RunOutcome],
 ) -> HostProcess {
   {
     policy,
     stdio,
     handles,
-    group,
     process_env: Map([]),
     process_args: Map([]),
     children: Map([]),
@@ -35,6 +32,9 @@ pub fn HostProcess::HostProcess(
 pub fn HostProcess::close(self : HostProcess) -> Unit {
   for child in self.owned_children {
     child.close()
+    for stream in child.streams {
+      stream.close()
+    }
   }
   self.owned_children.clear()
   self.children.clear()

@@ -1,6 +1,6 @@
 ///|
 async test "ambient guest can query and signal a process created outside its run" {
-  let windows = @async.platform is Windows
+  let windows = @sys.platform is Windows
   let pid = if windows {
     @native_process.spawn_orphan("cmd", ["/d", "/c", "ping -n 6 127.0.0.1 >nul"])
   } else {
@@ -38,7 +38,7 @@ async test "ambient guest can query and signal a process created outside its run
       old="PENDING",
       new=if windows {
         "997"
-      } else if @async.platform is MacOS {
+      } else if @sys.platform is MacOS {
         "35"
       } else {
         "11"
@@ -46,12 +46,12 @@ async test "ambient guest can query and signal a process created outside its run
     )
     .replace(old="STATUS", new=if windows { "1" } else { "-9" }),
   )
-  assert_eq(@async.with_timeout(3000, () => program.run()), Completed)
+  assert_eq(program.run(control=cancel_after(3000)), Completed)
   reaped = true
 }
 
 ///|
-async test "policy denies opening a process not created by the guest" {
+test "policy denies opening a process not created by the guest" {
   let source =
     #|(module
     #| (import "moonbitlang/async" "process/open_pid_handle" (func $open (param i32) (result i64)))
@@ -65,7 +65,7 @@ async test "policy denies opening a process not created by the guest" {
     compile(
       source.replace(
         old="PERMISSION",
-        new=if @async.platform is Windows { "5" } else { "13" },
+        new=if @sys.platform is Windows { "5" } else { "13" },
       ),
     ).run(policy~),
     Completed,
@@ -73,8 +73,8 @@ async test "policy denies opening a process not created by the guest" {
 }
 
 ///|
-async test "legacy spawn merges overrides and ignores initialized invalid environment entries" {
-  if @async.platform is Windows {
+test "legacy spawn merges overrides and ignores initialized invalid environment entries" {
+  if @sys.platform is Windows {
     return
   }
   let source =
@@ -115,11 +115,11 @@ async test "legacy spawn merges overrides and ignores initialized invalid enviro
     #|     if i32.const 1 call $sleep call $run br $wait end
     #|   end
     #|   i32.const 256 i32.load i32.const 23 i32.ne if unreachable end))
-  assert_eq(@async.with_timeout(3000, () => compile(source).run()), Completed)
+  assert_eq(compile(source).run(control=cancel_after(3000)), Completed)
 }
 
 ///|
-async test "current and legacy spawn result handle imports return null before publication" {
+test "current and legacy spawn result handle imports return null before publication" {
   let source =
     #|(module
     #| (import "moonbitlang/sqlite" "sqlite3_null_handle" (func $null (result i64)))
@@ -132,8 +132,8 @@ async test "current and legacy spawn result handle imports return null before pu
 }
 
 ///|
-async test "macOS PID fallback clears stale errno" {
-  if !(@async.platform is MacOS) {
+test "macOS PID fallback clears stale errno" {
+  if !(@sys.platform is MacOS) {
     return
   }
   let source =
@@ -153,8 +153,8 @@ async test "macOS PID fallback clears stale errno" {
 // Compatibility regressions; original probes from moon/crates/moonrun/tests at 12e9d22e.
 
 ///|
-async test "process result distinguishes null and reserved invalid handles" {
-  if @async.platform is Windows {
+test "process result distinguishes null and reserved invalid handles" {
+  if @sys.platform is Windows {
     return
   }
   let source =
@@ -177,8 +177,8 @@ async test "process result distinguishes null and reserved invalid handles" {
 }
 
 ///|
-async test "spawn rejects zero stdio instead of treating it as the invalid-fd sentinel" {
-  if @async.platform is Windows {
+test "spawn rejects zero stdio instead of treating it as the invalid-fd sentinel" {
+  if @sys.platform is Windows {
     return
   }
   let source =

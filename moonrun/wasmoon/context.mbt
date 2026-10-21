@@ -3,8 +3,7 @@
 pub struct Context {
   priv runtime : @state.Runtime
   priv values : Array[HostValue]
-  priv mut pending : (async () -> Array[@wasm.Value])?
-  priv mut ready : Array[@wasm.Value]?
+  priv poll : () -> Unit raise
   priv mut exit_code : Int32?
   priv mut wasi_context : @wasi.WasiContext?
   priv mut ffi_memory : @vm.Memory?
@@ -13,12 +12,14 @@ pub struct Context {
 }
 
 ///|
-pub fn Context::Context(runtime : @state.Runtime) -> Context {
+pub fn Context::Context(
+  runtime : @state.Runtime,
+  poll~ : () -> Unit raise = () => (),
+) -> Context {
   {
     runtime,
+    poll,
     values: [],
-    pending: None,
-    ready: None,
     exit_code: None,
     wasi_context: None,
     ffi_memory: None,
@@ -36,6 +37,11 @@ pub fn Context::close(self : Context) -> Unit {
     }
   }
   self.values.clear()
-  self.pending = None
-  self.ready = None
+}
+
+///|
+fn Context::progress(self : Context) -> Unit raise {
+  (self.poll)()
+  self.runtime.process.pump()
+  self.runtime.async_host.refresh()
 }

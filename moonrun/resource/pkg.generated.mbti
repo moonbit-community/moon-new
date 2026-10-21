@@ -2,14 +2,11 @@
 package "moonbit-community/moonrun/resource"
 
 import {
-  "moonbit-community/moonrun/run_termination",
-  "moonbitlang/async",
-  "moonbitlang/async/cond_var",
-  "moonbitlang/async/fs",
-  "moonbitlang/async/raw_fd",
+  "moonbit-community/moonrun/async_sys",
 }
 
 // Values
+pub fn result(@async_sys.Operation) -> JobResult
 
 // Errors
 
@@ -31,7 +28,9 @@ pub(all) struct IoResult {
   data : Bytes
   position : Int64
   flags : Int32
-  mut task : @async.Task[Unit]?
+  mut task : @async_sys.Worker?
+  mut work : Task?
+  mut resource : Resource?
   mut result : JobResult?
   mut pending : Bool
   mut fd : Int64?
@@ -47,10 +46,6 @@ pub(all) struct JobResult {
 
 pub(all) struct Resource {
   owner : ResourceKind
-  read_lock : @async.Mutex
-  write_lock : @async.Mutex
-  cursor_lock : @async.Mutex
-  mut cursor : Int64
   append : Bool
   guest_async : Bool
   mut path : String?
@@ -58,15 +53,17 @@ pub(all) struct Resource {
 }
 pub fn Resource::Resource(ResourceKind, append? : Bool, guest_async? : Bool, path? : String) -> Self
 pub fn Resource::native(Self) -> Int32
-pub fn Resource::new_socket(Int32, @async.TaskGroup[@run_termination.RunOutcome]) -> Self raise
-pub async fn Resource::read_job(Self, Int32, Int64, flags? : Int32) -> JobResult
+pub fn Resource::new_socket(Int32) -> Self raise
+pub fn Resource::prepare_read(Self, Int32, Int64, flags? : Int32) -> Task raise
+pub fn Resource::prepare_write(Self, Bytes, Int64, flags? : Int32) -> Task raise
+pub fn Resource::read_job(Self, Int32, Int64, flags? : Int32) -> JobResult raise
 pub fn Resource::release(Self) -> Unit
 pub fn Resource::retain(Self) -> Unit
-pub async fn Resource::write_job(Self, Bytes, Int64, flags? : Int32) -> JobResult
+pub fn Resource::write_job(Self, Bytes, Int64, flags? : Int32) -> JobResult raise
 
 pub(all) enum ResourceKind {
-  Pipe(@raw_fd.RawFd, Bool)
-  File(@fs.File)
+  Pipe(Int32, Bool)
+  File(@async_sys.File)
   Standard(Int32, Int32)
   Socket(Socket)
   Watcher(Watcher)
@@ -74,20 +71,19 @@ pub(all) enum ResourceKind {
 
 pub struct Socket {
   fd : Int32
-  read : @cond_var.Cond
-  write : @cond_var.Cond
-  mut read_sequence : Int64
-  mut write_sequence : Int64
-  mut pump : @async.Task[Unit]?
-  mut closed : Bool
-  mut connect_error : Int32?
+  // private fields
 }
 pub fn Socket::close(Self) -> Unit
-pub async fn Socket::connect(Self, Bytes) -> Unit
-pub async fn Socket::read(Self, FixedArray[Byte], Int32) -> Int32
-pub async fn Socket::wait_read(Self, Int64) -> Unit
-pub async fn Socket::wait_write(Self, Int64) -> Unit
-pub async fn Socket::write(Self, Bytes, Int32) -> Int32
+
+pub struct Task {
+  operation : @async_sys.Operation
+  // private fields
+}
+pub fn Task::Task(@async_sys.Operation, publish? : () -> JobResult raise, cleanup? : () -> Unit) -> Self
+pub fn Task::close(Self) -> Unit
+pub fn Task::publish(Self) -> JobResult raise
+pub fn Task::ready(JobResult) -> Self
+pub fn Task::run(Self) -> JobResult raise
 
 pub(all) struct Watcher {
   fd : Int32

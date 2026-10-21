@@ -48,8 +48,8 @@ fn mbtx_policy_value(content : String) -> Json raise {
 ///|
 /// Load JSON, TOML, or leading `.mbtx` YAML comments. Relative filesystem roots
 /// use the document directory, unless a source directory is supplied explicitly.
-pub async fn Policy::load_file(path : String, source_dir? : String) -> Policy {
-  let content = @fs.read_file(path).text()
+pub fn Policy::load_file(path : String, source_dir? : String) -> Policy raise {
+  let content = @sys.read_file_to_string(path)
   let extension = ascii_lower(@path.Path(path).extname())
   let value = if extension == ".mbtx" {
     mbtx_policy_value(content)

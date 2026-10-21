@@ -12,11 +12,11 @@ fn HostNetwork::socket_allowed(
 }
 
 ///|
-async fn HostNetwork::authorize_socket(
+fn HostNetwork::authorize_socket(
   self : HostNetwork,
   bind : Bool,
   bytes : Bytes,
-) -> Unit {
+) -> Unit raise {
   if !self.socket_allowed(bind, bytes) {
     self.stdio.deny(
       if bind {
@@ -30,15 +30,15 @@ async fn HostNetwork::authorize_socket(
 }
 
 ///|
-pub async fn HostNetwork::resolve_hostname(
+pub fn HostNetwork::resolve_hostname(
   self : HostNetwork,
   name : String,
-) -> @resource.JobResult {
+) -> @resource.Task raise {
   let normalized = @policy.dns_name(name)
   if self.policy is Some(policy) && !policy.allows_lookup(normalized) {
     self.stdio.deny("DNS lookup", target=name)
   }
-  let result = @native_jobs.run_native_job(
+  let task = @native_jobs.make_native_job(
     ResolveHost,
     name,
     @sys.invalid_native_fd(),
@@ -46,22 +46,25 @@ pub async fn HostNetwork::resolve_hostname(
     0,
     false,
   )
-  if result.ret == 0 && result.errno == 0 && self.policy is Some(policy) {
-    let data = result.data.to_fixedarray()
-    let mut offset = 0
-    while offset < data.length() {
-      let length = @sys.buffer_word(data, offset, 4).to_int()
-      @sys.check_range(offset + 4, length, data.length())
-      let ip = @policy.address_ip(
-        @sys.decode_address(
-          result.data[offset + 4:offset + 4 + length].to_owned(),
-        ),
-      )
-      self.resolved_connect.append(
-        policy.resolved_connect_rules(normalized, ip),
-      )
-      offset += 4 + length
+  @resource.Task(task.operation, publish=() => {
+    let result = task.publish()
+    if result.ret == 0 && result.errno == 0 && self.policy is Some(policy) {
+      let data = result.data.to_fixedarray()
+      let mut offset = 0
+      while offset < data.length() {
+        let length = @sys.buffer_word(data, offset, 4).to_int()
+        @sys.check_range(offset + 4, length, data.length())
+        let ip = @policy.address_ip(
+          @sys.decode_address(
+            result.data[offset + 4:offset + 4 + length].to_owned(),
+          ),
+        )
+        self.resolved_connect.append(
+          policy.resolved_connect_rules(normalized, ip),
+        )
+        offset += 4 + length
+      }
     }
-  }
-  result
+    result
+  })
 }

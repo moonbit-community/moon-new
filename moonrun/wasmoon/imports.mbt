@@ -104,7 +104,10 @@ fn Context::register(
           (caller, args) => {
             match family {
               Some(family) =>
-                self.async_import(caller, name, args, family) catch {
+                try {
+                  self.progress()
+                  self.async_import(caller, name, args, family)
+                } catch {
                   error => raise import_error(error)
                 }
               None => {
@@ -293,7 +296,7 @@ fn Context::dispatch_impl(
       }
     ("moonbitlang/core", "env/current_exe" | "env/current_exe_dir") => {
       guard self.runtime.executable is Some(path) else {
-        self.runtime.async_host.async_errno = if @async.platform is Windows {
+        self.runtime.async_host.async_errno = if @sys.platform is Windows {
           87
         } else {
           22
@@ -305,7 +308,7 @@ fn Context::dispatch_impl(
       } else {
         path
       }
-      let bytes = if @async.platform is Windows {
+      let bytes = if @sys.platform is Windows {
         @utf16.encode(path + "\u0000", endianness=Little, bom=false)
       } else {
         @utf8.encode(path + "\u0000")
@@ -317,17 +320,13 @@ fn Context::dispatch_impl(
     ("moonbit:ffi/memory-sanitizer", _) => self.memory_sanitizer(name, args)
     ("spectest", "print_char") | ("moonbit", "string_to_js_string") => {
       let unit = i32(args[0])
-      self.suspend(() => {
-        self.runtime.stdio.print_unit(unit)
-        []
-      })
+      self.runtime.stdio.print_unit(unit)
+      []
     }
     ("console", "log") => {
       let bytes = @utf8.encode(self.text(args[0]) + "\n")
-      self.suspend(() => {
-        self.runtime.stdio.output(1, bytes)
-        []
-      })
+      self.runtime.stdio.output(1, bytes)
+      []
     }
     ("__moonbit_sys_unstable", "exit") => {
       let code = i32(args[0])
@@ -343,29 +342,23 @@ fn Context::dispatch_impl(
       }
       let fd = i32(args[0])
       let bytes = @utf8.encode(code.unsafe_to_char().to_string())
-      self.suspend(() => {
-        if fd == 1 || fd == 2 {
-          self.runtime.stdio.output(fd, bytes)
-        }
-        []
-      })
+      if fd == 1 || fd == 2 {
+        self.runtime.stdio.output(fd, bytes)
+      }
+      []
     }
     ("__moonbit_io_unstable", "flush") => []
     ("__moonbit_io_unstable", "read_char") | ("spectest", "read_char") =>
-      self.suspend(() => {
-        [
-          I32(
-            self.runtime.stdio.read_char() catch {
-              @os_error.OSError(_, ..) => -1
-              error => raise error
-            },
-          ),
-        ]
-      })
+      [
+        I32(
+          self.runtime.stdio.read_char() catch {
+            @sys.OSError(_, ..) => -1
+            error => raise error
+          },
+        ),
+      ]
     ("__moonbit_io_unstable", "read_bytes_from_stdin") =>
-      self.suspend(() => {
-        [self.put(Bytes(self.runtime.stdio.read_all().to_fixedarray()))]
-      })
+      [self.put(Bytes(self.runtime.stdio.read_all().to_fixedarray()))]
     ("__moonbit_time_unstable", "now") =>
       [I64(@env.now().reinterpret_as_int64())]
     ("__moonbit_time_unstable", "instant_now") =>
@@ -410,7 +403,10 @@ fn Context::dispatch(
   // FIXME: Map ABI host exceptions to catchable guest exceptions when Wasmoon
   // exposes that channel; keep genuine traps separate:
   // https://github.com/Milky2018/wasmoon/issues/550
-  self.dispatch_impl(caller, module_name, name, args) catch {
+  try {
+    self.progress()
+    self.dispatch_impl(caller, module_name, name, args)
+  } catch {
     error => raise import_error(error)
   }
 }

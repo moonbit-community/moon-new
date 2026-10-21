@@ -8,11 +8,11 @@ fn normalize_open_flags(flags : Int32) -> Int32 {
 }
 
 ///|
-async fn database_filename(
+fn database_filename(
   filesystem : @filesystem.HostFs,
   filename : Bytes,
   flags : Int32,
-) -> Bytes? {
+) -> Bytes? raise {
   guard !filename.iter().any(byte => byte == b'\x00') else { raise Fault }
   let path = @utf8.decode(filename) catch { _ => raise Fault }
   if path == ":memory:" {
@@ -30,7 +30,7 @@ async fn database_filename(
       filesystem.authorize_path(parent, read=false, write=true)
     }
   } catch {
-    @os_error.OSError(_) => return None
+    @sys.OSError(_) => return None
     error => raise error
   }
   Some(@utf8.encode(resolved))

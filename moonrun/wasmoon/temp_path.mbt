@@ -7,7 +7,7 @@ fn Context::temporary_path_import(
 ) -> Array[@wasm.Value] raise {
   let host = self.runtime.async_host
   if self.runtime.policy is Some(_) &&
-    @async.platform is Windows &&
+    @sys.platform is Windows &&
     ["TMP", "TEMP"].all(key => {
       @environment.environment_entry(self.runtime.env, key)
       .map(entry => entry.1.is_empty())
@@ -25,7 +25,7 @@ fn Context::temporary_path_import(
     "fs/get_tmp_path_len" => [I32(path.length())]
     "fs/get_tmp_path" => {
       guard i32(args[1]) == path.length() else {
-        host.async_errno = if @async.platform is Windows { 87 } else { 22 }
+        host.async_errno = if @sys.platform is Windows { 87 } else { 22 }
         return [I32(-1)]
       }
       let data = @utf16.encode(path, endianness=Little, bom=false)
@@ -40,7 +40,7 @@ fn Context::temporary_path_import(
     }
     _ => {
       let handle = self.runtime.handles.allocate()
-      host.buffers[handle] = (if @async.platform is Windows {
+      host.buffers[handle] = (if @sys.platform is Windows {
         @utf16.encode(path + "\u0000", endianness=Little, bom=false)
       } else {
         @utf8.encode(path + "\u0000")

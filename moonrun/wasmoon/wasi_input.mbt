@@ -62,27 +62,25 @@ fn Context::wasi_read(
   let requested = ranges.fold(init=0L, (total, range) => {
     total + range.1.to_int64()
   })
-  self.suspend(() => {
-    if requested == 0L {
-      memory.store_i32(result, 0)
-      return [I32(0)]
+  if requested == 0L {
+    memory.store_i32(result, 0)
+    return [I32(0)]
+  }
+  let data = self.runtime.stdio.read_chunk(
+    @cmp.minimum(requested, 0x7FFF_FFFFL).to_int(),
+  ) catch {
+    @sys.OSError(_, ..) => return [I32(@wasi.Errno::IO.to_i32())]
+    error => raise error
+  }
+  let mut read = 0
+  for (offset, size) in ranges {
+    let bytes = @cmp.minimum(data.length() - read, size)
+    memory.init_data_at(offset, data[read:read + bytes].to_owned())
+    read += bytes
+    if bytes < size {
+      break
     }
-    let data = self.runtime.stdio.read_chunk(
-      @cmp.minimum(requested, 0x7FFF_FFFFL).to_int(),
-    ) catch {
-      @os_error.OSError(_, ..) => return [I32(@wasi.Errno::IO.to_i32())]
-      error => raise error
-    }
-    let mut read = 0
-    for (offset, size) in ranges {
-      let bytes = @cmp.minimum(data.length() - read, size)
-      memory.init_data_at(offset, data[read:read + bytes].to_owned())
-      read += bytes
-      if bytes < size {
-        break
-      }
-    }
-    memory.store_i32(result, read)
-    [I32(0)]
-  })
+  }
+  memory.store_i32(result, read)
+  [I32(0)]
 }

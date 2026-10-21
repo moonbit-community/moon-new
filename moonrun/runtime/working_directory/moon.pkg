@@ -1,5 +1,5 @@
 import {
-  "moonbitlang/async",
+  "moonbit-community/moonrun/async_sys" @sys,
   "moonbitlang/x/path",
   "moonbitlang/x/path/win32" @winpath,
 }

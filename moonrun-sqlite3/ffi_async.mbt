@@ -97,18 +97,13 @@ pub fn sqlite3_step_job(
 }
 
 ///|
-async fn Sqlite3Job::wait(self : Sqlite3Job) -> Unit {
+fn Sqlite3Job::wait(self : Sqlite3Job) -> Unit {
   guard self.notification is Some(notification) else {
     abort("sqlite3: asynchronous job lost its completion notification")
   }
   let signal = FixedArray::make(1, b'\x00')
-  for ;; {
-    ignore(notification.read(signal, max_len=1)) catch {
-      @os_error.OSError(_) as error if error.is_EINTR() ||
-        error.is_nonblocking_io_error() => continue
-      _ => abort("sqlite3: asynchronous completion notification failed")
-    }
-    break
+  ignore(notification.read(signal, max_len=1)) catch {
+    _ => abort("sqlite3: native completion notification failed")
   }
   if !self.acquire_result() {
     abort("sqlite3: asynchronous job woke before publishing its result")
@@ -144,8 +139,8 @@ fn Sqlite3Job::close_notification(self : Sqlite3Job) -> Unit {
 }
 
 ///|
-/// Wait for a submitted job to complete. This does not cancel SQLite work; use @async.protect_from_cancel when cancellation must await cleanup.
-pub async fn Sqlite3OpenJob::wait(self : Sqlite3OpenJob) -> Unit {
+/// Block until a submitted job completes. This does not cancel SQLite work.
+pub fn Sqlite3OpenJob::wait(self : Sqlite3OpenJob) -> Unit {
   self.job.wait()
 }
 
@@ -170,8 +165,8 @@ pub fn Sqlite3OpenJob::release(self : Sqlite3OpenJob) -> Unit {
 }
 
 ///|
-/// After successful completion, close an untaken database on its executor. Await this under cancellation protection before release; this does not release the job itself.
-pub async fn Sqlite3OpenJob::discard(self : Sqlite3OpenJob) -> Unit {
+/// After successful completion, close an untaken database on its executor. Complete this before release; this does not release the job itself.
+pub fn Sqlite3OpenJob::discard(self : Sqlite3OpenJob) -> Unit {
   let handle = sqlite3_open_job_discard_impl(self.job.handle)
   let discard = Sqlite3Job::{
     handle,
@@ -181,8 +176,8 @@ pub async fn Sqlite3OpenJob::discard(self : Sqlite3OpenJob) -> Unit {
 }
 
 ///|
-/// Wait for submitted preparation to complete. Protect this wait from cancellation so the statement can be taken or discarded before release.
-pub async fn Sqlite3PrepareJob::wait(self : Sqlite3PrepareJob) -> Unit {
+/// Block until submitted preparation completes so the statement can be taken or discarded before release.
+pub fn Sqlite3PrepareJob::wait(self : Sqlite3PrepareJob) -> Unit {
   self.job.wait()
 }
 
@@ -216,8 +211,8 @@ pub fn Sqlite3PrepareJob::release(self : Sqlite3PrepareJob) -> Unit {
 }
 
 ///|
-/// After successful completion, finalize an untaken statement on its executor. Await this under cancellation protection before release; this does not release the job itself.
-pub async fn Sqlite3PrepareJob::discard(self : Sqlite3PrepareJob) -> Unit {
+/// After successful completion, finalize an untaken statement on its executor. Complete this before release; this does not release the job itself.
+pub fn Sqlite3PrepareJob::discard(self : Sqlite3PrepareJob) -> Unit {
   let handle = sqlite3_prepare_job_discard_impl(self.job.handle)
   let discard = Sqlite3Job::{
     handle,
@@ -227,8 +222,8 @@ pub async fn Sqlite3PrepareJob::discard(self : Sqlite3PrepareJob) -> Unit {
 }
 
 ///|
-/// Wait for submitted stepping to complete. Protect the wait from cancellation and keep the database and statement alive until completion.
-pub async fn Sqlite3StepJob::wait(self : Sqlite3StepJob) -> Unit {
+/// Block until submitted stepping completes. Keep the database and statement alive until completion.
+pub fn Sqlite3StepJob::wait(self : Sqlite3StepJob) -> Unit {
   self.0.wait()
 }
 
@@ -250,4 +245,19 @@ pub fn Sqlite3StepJob::result(
 pub fn Sqlite3StepJob::release(self : Sqlite3StepJob) -> Unit {
   self.0.close_notification()
   sqlite3_step_job_release_impl(self.0.handle)
+}
+
+///|
+pub fn Sqlite3OpenJob::notification_fd(self : Sqlite3OpenJob) -> @pipe.Fd {
+  self.job.notification.unwrap().fd()
+}
+
+///|
+pub fn Sqlite3PrepareJob::notification_fd(self : Sqlite3PrepareJob) -> @pipe.Fd {
+  self.job.notification.unwrap().fd()
+}
+
+///|
+pub fn Sqlite3StepJob::notification_fd(self : Sqlite3StepJob) -> @pipe.Fd {
+  self.0.notification.unwrap().fd()
 }

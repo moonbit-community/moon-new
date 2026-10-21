@@ -41,7 +41,7 @@ fn Context::watcher_import(
 ) -> Array[@wasm.Value] raise {
   let host = self.runtime.async_host
   if name.has_prefix("fs/watcher/windows/") {
-    guard @async.platform is Windows else {
+    guard @sys.platform is Windows else {
       raise @vm.UnknownImport("moonbitlang/async", name)
     }
     if name == "fs/watcher/windows/buffer/new" {
@@ -98,14 +98,14 @@ fn Context::watcher_import(
       _ => raise @vm.TypeMismatch
     }
   }
-  guard (name.contains("inotify") && @async.platform is Linux) ||
-    (name.contains("kqueue_watcher") && @async.platform is MacOS) else {
+  guard (name.contains("inotify") && @sys.platform is Linux) ||
+    (name.contains("kqueue_watcher") && @sys.platform is MacOS) else {
     raise @vm.UnknownImport("moonbitlang/async", name)
   }
   if name.has_suffix("/create") {
     let fd = @sys.create_watcher()
     if fd == @sys.invalid_native_fd() {
-      host.async_errno = @os_error.get_errno()
+      host.async_errno = @sys.get_errno()
       return [I64(self.runtime.handles.invalid_fd)]
     }
     let handle = self.runtime.handles.allocate()
@@ -123,7 +123,7 @@ fn Context::watcher_import(
       raise @vm.TypeMismatch
     }
     let offset = i32(args[1])
-    if @async.platform is MacOS {
+    if @sys.platform is MacOS {
       guard offset >= 0 && offset <= buffer.length() / 32 - 1 else {
         raise @vm.OutOfBoundsMemoryAccess
       }
@@ -210,7 +210,7 @@ fn Context::watcher_import(
             host.new_job(
               () => {
                 self.runtime.filesystem.authorize_path(path)
-                @native_jobs.run_native_job(
+                @native_jobs.make_native_job(
                   AddWatch,
                   path,
                   watcher.fd,
@@ -231,7 +231,7 @@ fn Context::watcher_import(
         let length = i32(args[2])
         @sys.check_range(0, length, buffer.length())
         let count = @sys.watcher_fetch(watcher.fd, buffer, length)
-        if count >= 0 && @async.platform is MacOS {
+        if count >= 0 && @sys.platform is MacOS {
           for index in 0..<count {
             let offset = index * 32
             let raw = @sys.buffer_word(buffer, offset, 8)

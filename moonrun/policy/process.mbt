@@ -44,7 +44,7 @@ pub fn Policy::allows_process(
 ) -> Bool {
   self.spawn ||
   self.programs.any(rule => {
-    if @async.platform is Windows {
+    if @sys.platform is Windows {
       command == rule.windows_prefix ||
       command.has_prefix(rule.windows_prefix + " ")
     } else {

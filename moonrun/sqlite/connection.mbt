@@ -27,12 +27,12 @@ fn new_database(
 }
 
 ///|
-pub async fn HostSqlite::open_v2(
+pub fn HostSqlite::open_v2(
   self : HostSqlite,
   filename : Bytes,
   flags : Int32,
   vfs : Int64,
-) -> (Int32, Int64) {
+) -> (Int32, Int64) raise {
   if vfs != self.handles.null_handle {
     return (14, self.handles.null_handle)
   }

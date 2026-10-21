@@ -3,7 +3,7 @@
 pub type NativeEventBus
 
 ///|
-pub extern "C" fn create_event_bus(fd : @types.Fd) -> NativeEventBus = "moonrun_event_bus_create"
+pub extern "C" fn create_event_bus(fd : Fd) -> NativeEventBus = "moonrun_event_bus_create"
 
 ///|
 pub extern "C" fn event_bus_is_null(bus : NativeEventBus) -> Bool = "moonrun_event_bus_is_null"
@@ -26,7 +26,7 @@ pub extern "C" fn event_wait_errno(bus : NativeEventBus) -> Int32 = "moonrun_eve
 ///|
 pub extern "C" fn register_event_fd(
   bus : NativeEventBus,
-  fd : @types.Fd,
+  fd : Fd,
   read_only : Bool,
   key : Int64,
 ) -> Int32 = "moonrun_event_bus_register"
@@ -49,7 +49,7 @@ pub extern "C" fn event_pid(bus : NativeEventBus, index : Int32) -> Int32 = "moo
 ///|
 pub extern "C" fn register_completion_fd(
   bus : NativeEventBus,
-  fd : @types.Fd,
+  fd : Fd,
   key : Int64,
 ) -> Int32 = "moonrun_event_bus_register_completion"
 
@@ -64,21 +64,17 @@ pub extern "C" fn post_completion(
 ///|
 pub struct EventBus {
   native : NativeEventBus
-  read : @pipe.PipeRead
   mut closed : Bool
   registered : Set[Int64]
 }
 
 ///|
 pub fn EventBus::new() -> EventBus raise {
-  let (read, write) = @pipe.pipe()
-  errdefer read.close()
-  defer write.close()
-  let native = create_event_bus(write.fd())
+  let native = create_event_bus(invalid_native_fd())
   guard !event_bus_is_null(native) else {
     raise Operation("failed to create guest event bus")
   }
-  { native, read, closed: false, registered: Set([]), }
+  { native, closed: false, registered: Set([]), }
 }
 
 ///|
@@ -87,16 +83,14 @@ pub fn EventBus::close(self : EventBus) -> Unit {
     return
   }
   self.closed = true
-  // Stop and join the C worker before releasing the notification reader.
   close_event_bus(self.native)
-  self.read.close()
 }
 
 ///|
-pub async fn EventBus::wait(self : EventBus, timeout : Int32) -> Int32 {
+pub fn EventBus::wait(self : EventBus, timeout : Int32) -> Int32 {
   begin_event_wait(self.native, timeout)
-  // Only this task accesses the pipe. Cancellation unwinds to @wasmoon.Context::close,
-  // which wakes the native wait and joins it without accessing the MoonBit heap.
-  ignore(self.read.read_exactly(1))
   event_wait_result(self.native)
 }
+
+///|
+pub extern "C" fn null_event_bus() -> NativeEventBus = "moonrun_event_bus_null"

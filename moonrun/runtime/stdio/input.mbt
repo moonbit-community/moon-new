@@ -1,16 +1,9 @@
 ///|
-let input_lock : @async.Mutex = @async.Mutex()
-
-///|
-async fn Stdio::read_byte(self : Stdio) -> Int32 {
+fn Stdio::read_byte(self : Stdio) -> Int32 raise {
   if self.input_offset >= self.input.length() {
     self.input = match self.stdin {
       Some(read) => read()
-      None => {
-        input_lock.acquire()
-        defer input_lock.release()
-        @native_stdio.stdin.read_some(max_len=4096).unwrap_or(b"")
-      }
+      None => @sys.stdin.read_some(max_len=4096).unwrap_or(b"")
     }
     self.input_offset = 0
   }
@@ -23,7 +16,7 @@ async fn Stdio::read_byte(self : Stdio) -> Int32 {
 }
 
 ///|
-pub async fn Stdio::read_char(self : Stdio) -> Int32 {
+pub fn Stdio::read_char(self : Stdio) -> Int32 raise {
   let first = self.read_byte()
   if first < 0 {
     return -1
@@ -50,7 +43,7 @@ pub async fn Stdio::read_char(self : Stdio) -> Int32 {
 }
 
 ///|
-pub async fn Stdio::read_all(self : Stdio) -> Bytes {
+pub fn Stdio::read_all(self : Stdio) -> Bytes raise {
   let chunks = []
   if self.input_offset < self.input.length() {
     chunks.push(self.input[self.input_offset:].to_owned())
@@ -65,11 +58,7 @@ pub async fn Stdio::read_all(self : Stdio) -> Bytes {
         }
         chunks.push(chunk)
       }
-    None => {
-      input_lock.acquire()
-      defer input_lock.release()
-      chunks.push(@native_stdio.stdin.read_all().binary())
-    }
+    None => chunks.push(@sys.stdin.read_all())
   }
   let length = chunks.fold(init=0, (length, chunk) => length + chunk.length())
   let buffer = FixedArray::make(length, b'\x00')
@@ -84,7 +73,7 @@ pub async fn Stdio::read_all(self : Stdio) -> Bytes {
 }
 
 ///|
-pub async fn Stdio::read_chunk(self : Stdio, length : Int32) -> Bytes {
+pub fn Stdio::read_chunk(self : Stdio, length : Int32) -> Bytes raise {
   if length == 0 {
     return b""
   }

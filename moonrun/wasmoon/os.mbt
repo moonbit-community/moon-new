@@ -18,7 +18,7 @@ fn Context::common_async_import(
     "runtime/get_platform" =>
       [
         I32(
-          match @async.platform {
+          match @sys.platform {
             Linux => 0
             MacOS => 1
             Windows => 2
@@ -37,8 +37,8 @@ fn Context::common_async_import(
     // Native async owns the process-wide Winsock reference. Guest loop teardown
     // must not call WSACleanup and invalidate the embedding host's sockets.
     "runtime/init_WSA" | "runtime/cleanup_WSA" => [I32(0)]
-    "os_error/get_ENOTDIR" => [I32(@os_error.errno_ENOTDIR)]
-    "os_error/get_ENOTSUP" => [I32(@os_error.errno_ENOTSUP)]
+    "os_error/get_ENOTDIR" => [I32(@sys.errno_ENOTDIR)]
+    "os_error/get_ENOTSUP" => [I32(@sys.errno_ENOTSUP)]
     "os_error/errno_to_string" => {
       let bytes = @sys.native_error_message(i32(args[0]))
       let handle = self.runtime.handles.allocate()
@@ -77,51 +77,46 @@ fn Context::common_async_import(
         host.async_errno = @sys.bad_fd_errno
         return [I64(self.runtime.handles.invalid_fd)]
       }
-      self.suspend(() => {
-        if host.stdio_handles.get(id) is Some(handle) &&
-          host.fds.contains(handle) {
-          return [I64(handle)]
-        }
-        let fd = if (id == 0 && self.runtime.stdio.stdin is Some(_)) ||
-          (id == 1 && self.runtime.stdio.stdout is Some(_)) ||
-          (id == 2 && self.runtime.stdio.stderr is Some(_)) {
-          @sys.invalid_native_fd()
-        } else if id == 0 {
-          @native_stdio.stdin.fd()
-        } else if id == 1 {
-          @native_stdio.stdout.fd()
-        } else {
-          @native_stdio.stderr.fd()
-        }
-        let handle = self.runtime.handles.allocate()
-        host.fds[handle] = @resource.Resource(Standard(id, fd))
-        host.stdio_handles[id] = handle
-        [I64(handle)]
-      })
+      if host.stdio_handles.get(id) is Some(handle) && host.fds.contains(handle) {
+        return [I64(handle)]
+      }
+      let fd = if (id == 0 && self.runtime.stdio.stdin is Some(_)) ||
+        (id == 1 && self.runtime.stdio.stdout is Some(_)) ||
+        (id == 2 && self.runtime.stdio.stderr is Some(_)) {
+        @sys.invalid_native_fd()
+      } else if id == 0 {
+        @sys.stdin.fd()
+      } else if id == 1 {
+        @sys.stdout.fd()
+      } else {
+        @sys.stderr.fd()
+      }
+      let handle = self.runtime.handles.allocate()
+      host.fds[handle] = @resource.Resource(Standard(id, fd))
+      host.stdio_handles[id] = handle
+      [I64(handle)]
     }
     "fd_util/kind_of_fd" => {
       guard host.fds.get(i64(args[0])) is Some(fd) else {
         host.async_errno = @sys.bad_fd_errno
         return [I32(-1)]
       }
-      self.suspend(() => {
-        if fd.owner is Standard(id, _) &&
-          (
-            (id == 0 && self.runtime.stdio.stdin is Some(_)) ||
-            (id == 1 && self.runtime.stdio.stdout is Some(_)) ||
-            (id == 2 && self.runtime.stdio.stderr is Some(_))
-          ) {
-          return [I32(5)]
-        }
-        let stat = @native_jobs.packed_stat(fd.native(), 1, 16)
-        guard stat is [u32le(_), u32le(1), i64le(kind)] else {
-          raise @vm.TypeMismatch
-        }
-        [I32(kind.to_int())]
-      })
+      if fd.owner is Standard(id, _) &&
+        (
+          (id == 0 && self.runtime.stdio.stdin is Some(_)) ||
+          (id == 1 && self.runtime.stdio.stdout is Some(_)) ||
+          (id == 2 && self.runtime.stdio.stderr is Some(_))
+        ) {
+        return [I32(5)]
+      }
+      let stat = @native_jobs.packed_stat(fd.native(), 1, 16)
+      guard stat is [u32le(_), u32le(1), i64le(kind)] else {
+        raise @vm.TypeMismatch
+      }
+      [I32(kind.to_int())]
     }
     name if name.has_prefix("os_error/is_") => {
-      let error = @os_error.OSError(i32(args[0]), context="")
+      let error = @sys.OSError(i32(args[0]), context="")
       let value = match name {
         "os_error/is_nonblocking_io_error" => error.is_nonblocking_io_error()
         "os_error/is_EINTR" => error.is_EINTR()

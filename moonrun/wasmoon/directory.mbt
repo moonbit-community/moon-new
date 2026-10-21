@@ -23,7 +23,7 @@ fn Context::directory_import(
   args : Array[@wasm.Value],
 ) -> Array[@wasm.Value] raise {
   if name == "fs/dir_buffer_min_size" {
-    return [I32(if @async.platform is Windows { 632 } else { 299 })]
+    return [I32(if @sys.platform is Windows { 632 } else { 299 })]
   }
   guard self.runtime.async_host.buffers.get(i64(args[0])) is Some(buffer) else {
     raise @vm.TypeMismatch
@@ -31,7 +31,7 @@ fn Context::directory_import(
   let offset = i32(args[1])
   let word = (position, width) => @sys.buffer_word(buffer, position, width)
   let (record_length, name_offset, name_length, is_dir, is_hidden, identity) = match
-    @async.platform {
+    @sys.platform {
     Linux => {
       @sys.check_range(offset, 19, buffer.length())
       let length = word(offset + 16, 2).to_int()

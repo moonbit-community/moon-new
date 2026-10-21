@@ -4,7 +4,7 @@ pub fn AsyncHost::start_io(
   io : @resource.IoResult,
   handle : Int64,
   key : Int64,
-  action : async (@resource.Resource) -> @resource.JobResult,
+  action : (@resource.Resource) -> @resource.Task raise,
 ) -> Int32 raise {
   guard !io.pending && io.result is None else { raise @sys.Invalid }
   guard self.fds.get(key) is Some(fd) else {
@@ -19,37 +19,27 @@ pub fn AsyncHost::start_io(
     self.async_errno = 87
     return -1
   }
+  let work = action(fd) catch {
+    @sys.OSError(code, ..) => {
+      self.async_errno = code
+      return -1
+    }
+    error => raise error
+  }
+  fd.retain()
+  io.resource = Some(fd)
   io.fd = Some(key)
   io.pending = true
-  fd.retain()
+  io.work = Some(work)
   io.task = Some(
-    self.group.spawn(no_wait=true, () => {
-      defer fd.release()
-      let result = @async.handle_cancellation(() => {
-        action(fd) catch {
-          @os_error.OSError(code, ..) =>
-            { ret: -1, errno: code, data: b"", opened: None, }
-          error => raise error
-        }
-      })
-      io.result = Some(
-        result.unwrap_or_else(() => {
-          ret: -1,
-          errno: 995,
-          data: b"",
-          opened: None,
-        }),
-      )
-      if !self.shutting_down && !bus.closed {
-        let count = match io.result {
-          Some(result) => @cmp.maximum(0, result.ret)
-          None => 0
-        }
-        if @sys.post_completion(bus.native, key, handle, count) < 0 {
-          raise @sys.Operation("failed to post I/O completion")
-        }
-      }
-    }),
+    @sys.start_worker(
+      work.operation.raw(),
+      0,
+      @sys.invalid_native_fd(),
+      bus.native,
+      key,
+      handle,
+    ),
   )
   self.async_errno = 997
   -1

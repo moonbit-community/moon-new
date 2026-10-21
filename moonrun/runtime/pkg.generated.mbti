@@ -15,13 +15,13 @@ pub struct Module {
   // private fields
 }
 pub fn Module::from_bytes(Bytes, name? : String) -> Self raise
-pub async fn Module::load_file(String) -> Self
-pub async fn Module::run(Self, args? : Array[String], env? : Map[String, String], cwd? : String, stdin? : () -> Bytes, stdout? : (Bytes) -> Unit, stderr? : (Bytes) -> Unit, test_args? : String, control? : RunControl, policy? : @policy.Policy) -> @run_termination.RunOutcome
+pub fn Module::load_file(String) -> Self raise
+pub fn Module::run(Self, args? : Array[String], env? : Map[String, String], cwd? : String, stdin? : () -> Bytes, stdout? : (Bytes) -> Unit, stderr? : (Bytes) -> Unit, test_args? : String, control? : RunControl, policy? : @policy.Policy, stack_size? : Int64, no_stack_trace? : Bool) -> @run_termination.RunOutcome raise
 
 pub struct RunControl {
   // private fields
 }
-pub fn RunControl::RunControl() -> Self
+pub fn RunControl::RunControl(poll? : () -> Int32?) -> Self
 pub fn RunControl::send_signal(Self, Int32) -> Bool raise
 
 // Type aliases

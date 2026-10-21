@@ -1,8 +1,6 @@
 import {
-  "moonbitlang/async",
   "moonbitlang/core/cmp",
   "moonbit-community/moonrun/runtime/environment",
-  "moonbitlang/async/fs",
   "moonbitlang/x/path",
   "moonbit-community/moonrun/policy",
   "moonbit-community/moonrun/resource",

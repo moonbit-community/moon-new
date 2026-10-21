@@ -6,12 +6,12 @@ fn Context::event_bus_import(
 ) -> Array[@wasm.Value] raise {
   let host = self.runtime.async_host
   if name == "event_bus/create" {
-    return self.suspend(() => {
+    return {
       let bus = @sys.EventBus::new()
       let handle = self.runtime.handles.allocate()
       host.buses[handle] = bus
       [I64(handle)]
-    })
+    }
   }
   if name == "event_bus/event_fd" ||
     name == "event_bus/event_events/unix" ||
@@ -32,7 +32,7 @@ fn Context::event_bus_import(
       [I32(@sys.event_flags(bus.native, index.to_int()))]
     } else if name == "event_bus/event_io_result/windows" {
       let token = @sys.event_token(bus.native, index.to_int())
-      if @async.platform is Windows {
+      if @sys.platform is Windows {
         guard host.io_results.get(token) is Some(result) else {
           raise @vm.TypeMismatch
         }
@@ -79,7 +79,7 @@ fn Context::event_bus_import(
           handle,
         )
         if result < 0 {
-          host.async_errno = @os_error.get_errno()
+          host.async_errno = @sys.get_errno()
         }
         return [I32(result)]
       }
@@ -87,7 +87,7 @@ fn Context::event_bus_import(
         host.async_errno = @sys.bad_fd_errno
         return [I32(-1)]
       }
-      if !(@async.platform is Windows) &&
+      if !(@sys.platform is Windows) &&
         fd.owner is Standard(id, _) &&
         (
           (id == 0 && self.runtime.stdio.stdin is Some(_)) ||
@@ -97,7 +97,7 @@ fn Context::event_bus_import(
         // Callback streams have no kernel fd. Let the guest use worker jobs.
         return [I32(0)]
       }
-      let result = if @async.platform is Windows {
+      let result = if @sys.platform is Windows {
         // Native async owns the HANDLE's IOCP. Guest I/O results post their
         // completion into this bus without associating the HANDLE twice.
         for other_handle, other in host.buses {
@@ -121,7 +121,7 @@ fn Context::event_bus_import(
         bus.registered.add(handle)
       }
       if result < 0 {
-        host.async_errno = @os_error.get_errno()
+        host.async_errno = @sys.get_errno()
       }
       [I32(result)]
     }
@@ -136,16 +136,41 @@ fn Context::event_bus_import(
     }
     "event_bus/wait" => {
       let timeout = i32(args[1])
-      self.suspend(() => {
-        let count = bus.wait(timeout)
-        if count < 0 {
-          host.async_errno = @sys.event_wait_errno(bus.native)
-        } else {
-          host.current_bus = Some(i64(args[0]))
-        }
-        [I32(count)]
-      })
+      let count = self.wait_events(bus, timeout)
+      if count < 0 {
+        host.async_errno = @sys.event_wait_errno(bus.native)
+      } else {
+        host.current_bus = Some(i64(args[0]))
+      }
+      [I32(count)]
     }
     _ => raise @vm.UnknownImport("moonbitlang/async", name)
+  }
+}
+
+///|
+fn Context::wait_events(
+  self : Context,
+  bus : @sys.EventBus,
+  timeout : Int32,
+) -> Int32 raise {
+  let deadline = @wasi.native_clock_gettime_monotonic() +
+    timeout.to_int64() * 1000000L
+  for ;; {
+    self.progress()
+    let remaining = if timeout < 0 {
+      10
+    } else {
+      @cmp.maximum(
+        0L,
+        (deadline - @wasi.native_clock_gettime_monotonic() + 999999L) / 1000000L,
+      ).to_int()
+    }
+    let count = bus.wait(@cmp.minimum(remaining, 10))
+    self.progress()
+    if count != 0 ||
+      (timeout >= 0 && @wasi.native_clock_gettime_monotonic() >= deadline) {
+      return count
+    }
   }
 }

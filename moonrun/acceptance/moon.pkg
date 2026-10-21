@@ -1,11 +1,11 @@
 import {
+  "moonbitlang/async/signal",
   "moonbit-community/moonrun/runtime",
   "moonbitlang/async",
   "moonbitlang/async/stdio",
   "moonbitlang/async/fs",
   "moonbitlang/async/socket",
   "moonbitlang/async/os_error",
-  "moonbitlang/async/cond_var",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",
 }

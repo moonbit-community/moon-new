@@ -25,7 +25,7 @@ fn sqlite_guest(body : String) -> @runtime.Module raise {
 }
 
 ///|
-async test "SQLite releases unclaimed results when the common job is freed" {
+test "SQLite releases unclaimed results when the common job is freed" {
   let program = sqlite_guest(
     (
       #|i32.const 16 i32.const 8 i32.const 6 call $new local.set $job
@@ -39,7 +39,7 @@ async test "SQLite releases unclaimed results when the common job is freed" {
 }
 
 ///|
-async test "SQLite in-flight jobs and workers can be released before completion" {
+test "SQLite in-flight jobs and workers can be released before completion" {
   let program = sqlite_guest(
     (
       #|i32.const 64 i32.const 2 i32.const 1 i32.const 1 call $pipe if unreachable end
@@ -53,16 +53,14 @@ async test "SQLite in-flight jobs and workers can be released before completion"
   )
   for _ in 0..<5 {
     assert_eq(
-      @async.with_timeout(5000, () => {
-        program.run(env={ "MOONBIT_ASYNC_CHECK_FD_LEAK": "1" })
-      }),
+      program.run(env={ "MOONBIT_ASYNC_CHECK_FD_LEAK": "1" }),
       Completed,
     )
   }
 }
 
 ///|
-async test "SQLite ABI errors identify the operation and validate output ranges" {
+test "SQLite ABI errors identify the operation and validate output ranges" {
   for
     (body, expected) in [
       (
@@ -86,7 +84,7 @@ async test "SQLite ABI errors identify the operation and validate output ranges"
 }
 
 ///|
-async test "SQLite entered mutexes are released when a guest traps" {
+test "SQLite entered mutexes are released when a guest traps" {
   let program = sqlite_guest(
     (
       #|i32.const 16 i32.const 8 i32.const 64 i32.const 6 call $null call $open if unreachable end
@@ -94,10 +92,6 @@ async test "SQLite entered mutexes are released when a guest traps" {
       #|unreachable
     ),
   )
-  assert_true(
-    @async.with_timeout(5000, () => program.run(env={})) is Trapped(_),
-  )
-  assert_true(
-    @async.with_timeout(5000, () => program.run(env={})) is Trapped(_),
-  )
+  assert_true(program.run(env={}) is Trapped(_))
+  assert_true(program.run(env={}) is Trapped(_))
 }

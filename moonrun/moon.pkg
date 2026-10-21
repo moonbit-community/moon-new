@@ -1,12 +1,9 @@
 import {
+  "moonbit-community/moonrun/async_sys" @sys,
   "moonbit-community/moonrun/runtime",
-  "moonbitlang/async",
-  "moonbitlang/async/stdio",
-  "moonbitlang/async/signal",
-  "moonbitlang/async/pipe",
-  "moonbitlang/async/types",
-  "moonbitlang/x/sys",
+  "moonbitlang/x/sys" @system,
   "moonbitlang/core/env",
+  "moonbitlang/core/string",
 }
 
 pkgtype(kind: "executable")

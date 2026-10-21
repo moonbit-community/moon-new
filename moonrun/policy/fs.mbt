@@ -1,5 +1,5 @@
 ///|
-pub async fn policy_path(path : String, entry : Bool) -> String? {
+pub fn policy_path(path : String, entry : Bool) -> String? {
   let parts : Array[String] = []
   let mut current = path
   if entry {
@@ -7,8 +7,8 @@ pub async fn policy_path(path : String, entry : Bool) -> String? {
     current = @path.Path(current).dirname().to_string()
   }
   for ;; {
-    let canonical = Some(@fs.realpath(current)) catch {
-      @os_error.OSError(_, ..) as error if error.is_ENOENT() => None
+    let canonical = Some(@sys.realpath(current)) catch {
+      @sys.OSError(_, ..) as error if error.is_ENOENT() => None
       _ => return None
     }
     if canonical is Some(canonical) {

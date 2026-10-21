@@ -62,7 +62,7 @@ pub fn HostSqlite::make_prepare_job(Self, Int64, String) -> Job raise SqliteErro
 pub fn HostSqlite::make_step_job(Self, Int64, Int64) -> Job raise SqliteError
 pub fn HostSqlite::mutex_enter(Self, Int64) -> Unit raise SqliteError
 pub fn HostSqlite::mutex_leave(Self, Int64) -> Unit raise SqliteError
-pub async fn HostSqlite::open_v2(Self, Bytes, Int32, Int64) -> (Int32, Int64)
+pub fn HostSqlite::open_v2(Self, Bytes, Int32, Int64) -> (Int32, Int64) raise
 pub fn HostSqlite::prepare(Self, Int64, String) -> (Int32, Int64, Int32) raise SqliteError
 pub fn HostSqlite::release_entered_mutexes(Self) -> Unit
 pub fn HostSqlite::reset(Self, Int64) -> Int32 raise SqliteError
@@ -76,7 +76,7 @@ pub struct Job {
 pub fn Job::close(Self) -> Unit
 pub fn Job::discard(Self) -> Self? raise SqliteError
 pub fn Job::outcome(Self) -> Outcome raise SqliteError
-pub async fn Job::run(Self) -> @resource.JobResult
+pub fn Job::prepare(Self) -> @resource.Task raise
 
 pub struct Outcome {
   code : Int32

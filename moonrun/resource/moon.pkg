@@ -1,12 +1,5 @@
 import {
-  "moonbitlang/async",
-  "moonbitlang/async/cond_var",
-  "moonbitlang/async/fs",
-  "moonbitlang/async/os_error",
-  "moonbitlang/async/raw_fd",
   "moonbit-community/moonrun/async_sys" @sys,
-  "moonbit-community/moonrun/run_termination" @termination,
-  "moonbitlang/async/types",
 }
 
 options(

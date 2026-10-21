@@ -1,5 +1,5 @@
 ///|
-async test "native jobs transfer handles and preserve step snapshots" {
+test "native jobs transfer handles and preserve step snapshots" {
   let code = Ref(0)
   let executor = @ffi.sqlite3_executor_create(code)
   assert_eq(code.val, 0)
@@ -33,7 +33,7 @@ async test "native jobs transfer handles and preserve step snapshots" {
 }
 
 ///|
-async test "native jobs discard unclaimed results and retain diagnostics" {
+test "native jobs discard unclaimed results and retain diagnostics" {
   let code = Ref(0)
   let executor = @ffi.sqlite3_executor_create(code)
   assert_eq(code.val, 0)

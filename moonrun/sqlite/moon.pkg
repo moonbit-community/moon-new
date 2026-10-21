@@ -1,6 +1,5 @@
 import {
-  "moonbitlang/async",
-  "moonbitlang/async/os_error",
+  "moonbit-community/moonrun-sqlite3/io" @sqlite_io,
   "moonbit-community/moonrun/resource",
   "moonbit-community/moonrun-sqlite3" @ffi,
   "moonbit-community/moonrun/filesystem",

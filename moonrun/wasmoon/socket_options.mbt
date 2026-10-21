@@ -36,12 +36,12 @@ fn Context::socket_option_import(
       ""
     }
     if text.contains_char('\u0000') {
-      host.async_errno = if @async.platform is Windows { 87 } else { 22 }
+      host.async_errno = if @sys.platform is Windows { 87 } else { 22 }
       return [I32(0)]
     }
     let fd = @sys.make_udp_socket(4, false)
     if @sys.socket_invalid(fd) {
-      host.async_errno = @os_error.get_errno()
+      host.async_errno = @sys.get_errno()
       return if name == "socket/if_nametoindex" {
         [I32(0)]
       } else {
@@ -50,7 +50,7 @@ fn Context::socket_option_import(
     }
     defer @sys.close_socket(fd)
     if name == "socket/if_nametoindex" {
-      let text = if @async.platform is Windows {
+      let text = if @sys.platform is Windows {
         @utf16.encode(text, endianness=Little, bom=false) + b"\x00\x00"
       } else {
         // Match OsString: Bytes have a trailing NUL outside their length.
@@ -58,13 +58,13 @@ fn Context::socket_option_import(
       }
       let index = @sys.interface_index(fd, text)
       if index == 0U {
-        host.async_errno = @os_error.get_errno()
+        host.async_errno = @sys.get_errno()
       }
       [I32(index.reinterpret_as_int())]
     } else {
       let data = @sys.interface_name(fd, i32(args[0]).reinterpret_as_uint())
       if data.is_empty() {
-        host.async_errno = @os_error.get_errno()
+        host.async_errno = @sys.get_errno()
         return [I64(self.runtime.handles.null_handle)]
       }
       let handle = self.runtime.handles.allocate()

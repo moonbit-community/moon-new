@@ -17,14 +17,16 @@ pub struct Stdio {
   // private fields
 }
 pub fn Stdio::Stdio((() -> Bytes)?, ((Bytes) -> Unit)?, ((Bytes) -> Unit)?) -> Self
-pub async fn Stdio::deny(Self, String, target? : String) -> Unit
-pub async fn Stdio::output(Self, Int32, Bytes) -> Unit
-pub async fn Stdio::print_unit(Self, Int32) -> Unit
-pub async fn Stdio::read_all(Self) -> Bytes
-pub async fn Stdio::read_char(Self) -> Int32
-pub async fn Stdio::read_chunk(Self, Int32) -> Bytes
-pub async fn Stdio::read_fd(Self, @resource.Resource, Int32, Int64, flags? : Int32) -> @resource.JobResult
-pub async fn Stdio::write_fd(Self, @resource.Resource, Bytes, Int64, flags? : Int32) -> @resource.JobResult
+pub fn Stdio::deny(Self, String, target? : String) -> Unit raise
+pub fn Stdio::output(Self, Int32, Bytes) -> Unit raise
+pub fn Stdio::prepare_read(Self, @resource.Resource, Int32, Int64, flags? : Int32) -> @resource.Task raise
+pub fn Stdio::prepare_write(Self, @resource.Resource, Bytes, Int64, flags? : Int32) -> @resource.Task raise
+pub fn Stdio::print_unit(Self, Int32) -> Unit raise
+pub fn Stdio::read_all(Self) -> Bytes raise
+pub fn Stdio::read_char(Self) -> Int32 raise
+pub fn Stdio::read_chunk(Self, Int32) -> Bytes raise
+pub fn Stdio::read_fd(Self, @resource.Resource, Int32, Int64, flags? : Int32) -> @resource.JobResult raise
+pub fn Stdio::write_fd(Self, @resource.Resource, Bytes, Int64, flags? : Int32) -> @resource.JobResult raise
 
 // Type aliases
 

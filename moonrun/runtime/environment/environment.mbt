@@ -3,7 +3,7 @@ pub fn environment_entry(
   entries : Map[String, String],
   key : String,
 ) -> (String, String)? {
-  if @async.platform is Windows {
+  if @sys.platform is Windows {
     entries
     .iter()
     .find_first(pair => {

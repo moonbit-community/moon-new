@@ -1,71 +1,71 @@
 ///|
-pub async fn HostFs::read_file_to_string(
+pub fn HostFs::read_file_to_string(
   self : HostFs,
   path : String,
-) -> String {
+) -> String raise {
   self.authorize_path(path)
-  @utf8.decode(@fs.read_file(path).binary())
+  @utf8.decode(@sys.read_file(path))
 }
 
 ///|
-pub async fn HostFs::read_file_to_bytes(
+pub fn HostFs::read_file_to_bytes(
   self : HostFs,
   path : String,
-) -> FixedArray[Byte] {
+) -> FixedArray[Byte] raise {
   self.authorize_path(path)
-  @fs.read_file(path).binary().to_fixedarray()
+  @sys.read_file(path).to_fixedarray()
 }
 
 ///|
-pub async fn HostFs::write_file(
+pub fn HostFs::write_file(
   self : HostFs,
   path : String,
   contents : Bytes,
-) -> Unit {
+) -> Unit raise {
   self.authorize_path(path, read=false, write=true)
-  @fs.write_file(path, contents)
+  @sys.write_file(path, contents)
 }
 
 ///|
-pub async fn HostFs::create_dir(self : HostFs, path : String) -> Unit {
+pub fn HostFs::create_dir(self : HostFs, path : String) -> Unit raise {
   self.authorize_path(path, read=false, write=true, entry=true)
-  @fs.mkdir(path, recursive=true, allow_exist=true)
+  @sys.mkdir(path, recursive=true, allow_exist=true)
 }
 
 ///|
-pub async fn HostFs::remove_file(self : HostFs, path : String) -> Unit {
+pub fn HostFs::remove_file(self : HostFs, path : String) -> Unit raise {
   self.authorize_path(path, read=false, write=true, entry=true)
-  @fs.remove(path)
+  @sys.remove(path)
 }
 
 ///|
-pub async fn HostFs::read_dir(self : HostFs, path : String) -> Array[String] {
+pub fn HostFs::read_dir(self : HostFs, path : String) -> Array[String] raise {
   self.authorize_path(path)
-  @fs.readdir(path)
+  @sys.readdir(path)
 }
 
 ///|
-pub async fn HostFs::is_file(self : HostFs, path : String) -> Bool {
+pub fn HostFs::is_file(self : HostFs, path : String) -> Bool raise {
   self.authorize_path(path)
-  @fs.kind(path) is Regular
+  @sys.kind(path) is Regular
 }
 
 ///|
-pub async fn HostFs::is_dir(self : HostFs, path : String) -> Bool {
+pub fn HostFs::is_dir(self : HostFs, path : String) -> Bool raise {
   self.authorize_path(path)
-  @fs.kind(path) is Directory
+  @sys.kind(path) is Directory
 }
 
 ///|
-pub async fn HostFs::path_exists(self : HostFs, path : String) -> Bool {
+pub fn HostFs::path_exists(self : HostFs, path : String) -> Bool raise {
   self.authorize_path(path)
-  @fs.exists(path)
+  @sys.exists(path)
 }
 
 ///|
-pub async fn HostFs::remove_dir(self : HostFs, path : String) -> Unit {
+pub fn HostFs::remove_dir(self : HostFs, path : String) -> Unit raise {
   self.authorize_path(path, read=false, write=true, entry=true)
-  let root_length = if @async.platform is Windows {
+  let root_length = if @sys.platform is Windows {
     @winpath.Path(path).root().length()
   } else if path.has_prefix("/") {
     1
@@ -73,13 +73,13 @@ pub async fn HostFs::remove_dir(self : HostFs, path : String) -> Unit {
     0
   }
   let trimmed = path.trim_end(
-    chars=if @async.platform is Windows { "/\\" } else { "/" },
+    chars=if @sys.platform is Windows { "/\\" } else { "/" },
   )
-  let path = path[:@cmp.maximum(root_length, trimmed.length())]
+  let path = path[:@cmp.maximum(root_length, trimmed.length())].to_owned()
   // remove_dir_all removes a root symlink itself, never its target.
-  if @fs.kind(path, follow_symlink=false) is SymLink {
-    @fs.remove(path)
+  if @sys.kind(path, follow_symlink=false) is SymLink {
+    @sys.remove(path)
   } else {
-    @fs.rmdir(path, recursive=true)
+    @sys.rmdir(path, recursive=true)
   }
 }

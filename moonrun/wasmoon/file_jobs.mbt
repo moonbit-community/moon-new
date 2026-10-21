@@ -89,9 +89,9 @@ fn Context::file_job_import(
           host.new_job(
             () => {
               if reading {
-                self.runtime.stdio.read_fd(fd, length, position)
+                self.runtime.stdio.prepare_read(fd, length, position)
               } else {
-                self.runtime.stdio.write_fd(fd, data, position)
+                self.runtime.stdio.prepare_write(fd, data, position)
               }
             },
             cleanup=() => fd.release(),

@@ -75,7 +75,7 @@ fn Context::sqlite_job_import(
   [
     I64(
       self.runtime.async_host.new_job(
-        () => job.run(),
+        () => job.prepare(),
         cleanup=() => job.close(),
         sqlite=job,
       ),

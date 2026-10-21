@@ -119,6 +119,8 @@ fn Context::io_result_import(
       position,
       flags,
       task: None,
+      work: None,
+      resource: None,
       result: None,
       pending: false,
       fd: None,
@@ -149,12 +151,9 @@ fn Context::io_result_import(
             WatchDirectory(buffer) => {
               guard name == "io/read_dir_changes/windows" &&
                 fd.owner is @resource.Watcher(_) else {
-                raise @os_error.OSError(
-                  87,
-                  context="directory change notification",
-                )
+                raise @sys.OSError(87, context="directory change notification")
               }
-              let result = @native_jobs.run_native_job(
+              let task = @native_jobs.make_native_job(
                 ReadWatchEvents,
                 "",
                 fd.native(),
@@ -162,22 +161,30 @@ fn Context::io_result_import(
                 buffer.length(),
                 false,
               )
-              if result.ret >= 0 {
-                result.data
-                .to_fixedarray()
-                .blit_to(buffer, len=result.data.length())
-              }
-              result
+              @resource.Task(task.operation, publish=() => {
+                let result = task.publish()
+                if result.ret >= 0 {
+                  result.data
+                  .to_fixedarray()
+                  .blit_to(buffer, len=result.data.length())
+                }
+                result
+              })
             }
             Read =>
-              self.runtime.stdio.read_fd(
+              self.runtime.stdio.prepare_read(
                 fd,
                 io.length,
                 position,
                 flags=io.flags,
               )
             Write =>
-              self.runtime.stdio.write_fd(fd, io.data, position, flags=io.flags)
+              self.runtime.stdio.prepare_write(
+                fd,
+                io.data,
+                position,
+                flags=io.flags,
+              )
             _ => self.runtime.network.perform_socket_io(io, fd)
           }
         }),
@@ -251,7 +258,7 @@ fn Context::io_result_import(
         guard pointer + peer.length().to_int64() <= memory.byte_len() else {
           raise @vm.OutOfBoundsMemoryAccess
         }
-        memory.init_data_at(pointer, peer)
+        memory.init_data_at(pointer, io.peer.unwrap_or(peer))
       }
       memory.init_data_at(address, result.data[:length].to_owned())
       []

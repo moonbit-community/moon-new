@@ -1,7 +1,6 @@
 import {
-  "moonbitlang/async",
+  "moonbit-community/moonrun/async_sys" @sys,
   "moonbitlang/core/env",
-  "moonbitlang/async/fs",
   "moonbitlang/x/path",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",
@@ -10,16 +9,15 @@ import {
   "moonbit-community/moonrun/runtime/state",
   "moonbit-community/moonrun/run_termination" @termination,
   "Milky2018/wasm_core/validator",
-  "Milky2018/wasmoon/runtime" @vm,
+  "Milky2018/wasmoon_runtime/runtime" @vm,
   "Milky2018/wasm_core/types" @wasm,
   "moonbit-community/moonrun/wasmoon",
 }
 
 import {
-  "moonbitlang/async/cond_var",
+  "moonbitlang/async",
   "Milky2018/wasm_core/encoder",
   "moonbitlang/async/process" @native_process,
-  "moonbitlang/async/signal",
   "Milky2018/wasm_core/wat",
   "moonbitlang/core/encoding/utf16",
 } for "test"

@@ -1,13 +1,8 @@
 import {
-  "moonbitlang/async",
   "moonbit-community/moonrun/filesystem",
-  "moonbitlang/async/fs",
   "moonbit-community/moonrun/async_sys/jobs" @native_jobs,
-  "moonbitlang/async/os_error",
   "moonbit-community/moonrun/resource",
   "moonbit-community/moonrun/async_sys" @sys,
-  "moonbitlang/core/encoding/utf16",
-  "moonbitlang/core/encoding/utf8",
 }
 
 options(

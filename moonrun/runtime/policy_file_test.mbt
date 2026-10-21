@@ -12,11 +12,11 @@ let configured_policy_guest : String =
   #|   global.get $file call $read if unreachable end))
 
 ///|
-async test "TOML policy uses the same schema and resolves roots from its file" {
-  let directory = @fs.tmpdir(prefix="moonrun-policy-toml-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
-  @fs.mkdir(directory + "/allowed")
-  @fs.write_file(directory + "/allowed/input", "permitted")
+test "TOML policy uses the same schema and resolves roots from its file" {
+  let directory = @sys.tmpdir(prefix="moonrun-policy-toml-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
+  @sys.mkdir(directory + "/allowed")
+  @sys.write_file(directory + "/allowed/input", "permitted")
   let path = directory + "/policy.toml"
   let content =
     #|[fs]
@@ -26,7 +26,7 @@ async test "TOML policy uses the same schema and resolves roots from its file" {
     #|[[process.allow]]
     #|program = "echo"
     #|args_prefix = ["hello"]
-  @fs.write_file(path, content)
+  @sys.write_file(path, content)
   let policy = @runtime.Policy::load_file(path)
   assert_eq(
     compile(configured_policy_guest).run(cwd=directory, policy~),
@@ -35,12 +35,12 @@ async test "TOML policy uses the same schema and resolves roots from its file" {
 }
 
 ///|
-async test "mbtx YAML honors BOM CRLF leading blanks and an explicit source directory" {
-  let directory = @fs.tmpdir(prefix="moonrun-policy-yaml-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
-  @fs.mkdir(directory + "/allowed")
-  @fs.mkdir(directory + "/config")
-  @fs.write_file(directory + "/allowed/input", "permitted")
+test "mbtx YAML honors BOM CRLF leading blanks and an explicit source directory" {
+  let directory = @sys.tmpdir(prefix="moonrun-policy-yaml-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
+  @sys.mkdir(directory + "/allowed")
+  @sys.mkdir(directory + "/config")
+  @sys.write_file(directory + "/allowed/input", "permitted")
   let path = directory + "/config/script.MbTx"
   let content =
     #|// policy:
@@ -53,7 +53,10 @@ async test "mbtx YAML honors BOM CRLF leading blanks and an explicit source dire
     #|// explanation: [this is not part of the YAML
     #|///|
     #|fn main {}
-  @fs.write_file(path, "\u{feff}\r\n \t\r\n" + content.split("\n").join("\r\n"))
+  @sys.write_file(
+    path,
+    "\u{feff}\r\n \t\r\n" + content.split("\n").join("\r\n"),
+  )
   let policy = @runtime.Policy::load_file(path, source_dir=directory)
   assert_eq(
     compile(configured_policy_guest).run(cwd=directory, policy~),
@@ -62,15 +65,15 @@ async test "mbtx YAML honors BOM CRLF leading blanks and an explicit source dire
 }
 
 ///|
-async test "policy format selection matches JSON extensions and content sniffing" {
-  let directory = @fs.tmpdir(prefix="moonrun-policy-format-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
-  @fs.mkdir(directory + "/allowed")
-  @fs.write_file(directory + "/allowed/input", "permitted")
+test "policy format selection matches JSON extensions and content sniffing" {
+  let directory = @sys.tmpdir(prefix="moonrun-policy-format-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
+  @sys.mkdir(directory + "/allowed")
+  @sys.write_file(directory + "/allowed/input", "permitted")
   let content = "{\"env\":{\"set\":{\"VALUE\":\"configured\"}},\"fs\":{\"read\":[\"allowed\"]}}"
   for name in ["policy.JsOn", "policy.conf", "policy.toml"] {
     let path = directory + "/" + name
-    @fs.write_file(path, " \n" + content)
+    @sys.write_file(path, " \n" + content)
     let policy = @runtime.Policy::load_file(path)
     assert_eq(
       compile(configured_policy_guest).run(cwd=directory, policy~),
@@ -78,7 +81,7 @@ async test "policy format selection matches JSON extensions and content sniffing
     )
   }
   let path = directory + "/policy.conf"
-  @fs.write_file(
+  @sys.write_file(
     path, "[env.set]\nVALUE = 'configured'\n[fs]\nread = ['allowed']",
   )
   let policy = @runtime.Policy::load_file(path)
@@ -89,9 +92,9 @@ async test "policy format selection matches JSON extensions and content sniffing
 }
 
 ///|
-async test "invalid policy documents fail before a guest can run" {
-  let directory = @fs.tmpdir(prefix="moonrun-policy-invalid-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
+test "invalid policy documents fail before a guest can run" {
+  let directory = @sys.tmpdir(prefix="moonrun-policy-invalid-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
   for
     (name, content) in [
       ("policy.json", "[env]\nfrom_host = ['*']"),
@@ -117,7 +120,7 @@ async test "invalid policy documents fail before a guest can run" {
       ),
     ] {
     let path = directory + "/" + name
-    @fs.write_file(path, content)
+    @sys.write_file(path, content)
     let rejected = try {
       ignore(@runtime.Policy::load_file(path))
       false
@@ -129,9 +132,9 @@ async test "invalid policy documents fail before a guest can run" {
 }
 
 ///|
-async test "YAML string fields preserve scalar spelling and map duplicate semantics" {
-  let directory = @fs.tmpdir(prefix="moonrun-policy-scalars-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
+test "YAML string fields preserve scalar spelling and map duplicate semantics" {
+  let directory = @sys.tmpdir(prefix="moonrun-policy-scalars-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
   let path = directory + "/script.mbtx"
   let content =
     #|// policy:
@@ -152,7 +155,7 @@ async test "YAML string fields preserve scalar spelling and map duplicate semant
     #|//       123: numeric key
     #|//       DUPLICATE: first
     #|//       DUPLICATE: last
-  @fs.write_file(path, content)
+  @sys.write_file(path, content)
   let policy = @runtime.Policy::load_file(path)
   let source =
     #|(module
@@ -181,11 +184,11 @@ async test "YAML string fields preserve scalar spelling and map duplicate semant
 }
 
 ///|
-async test "YAML decoding supports aliases and empty collections with typed booleans" {
-  let directory = @fs.tmpdir(prefix="moonrun-policy-alias-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
-  @fs.mkdir(directory + "/allowed")
-  @fs.write_file(directory + "/allowed/input", "permitted")
+test "YAML decoding supports aliases and empty collections with typed booleans" {
+  let directory = @sys.tmpdir(prefix="moonrun-policy-alias-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
+  @sys.mkdir(directory + "/allowed")
+  @sys.write_file(directory + "/allowed/input", "permitted")
   let path = directory + "/script.mbtx"
   let content =
     #|// policy:
@@ -203,14 +206,14 @@ async test "YAML decoding supports aliases and empty collections with typed bool
     #|//       COPY: *value
     #|///|
     #|fn main {}
-  @fs.write_file(path, content)
+  @sys.write_file(path, content)
   let policy = @runtime.Policy::load_file(path)
   assert_eq(
     compile(configured_policy_guest).run(cwd=directory, policy~),
     Completed,
   )
   for content in ["// policy:\n///|\nfn main {}", "// policy: {}\nfn main {}"] {
-    @fs.write_file(path, content)
+    @sys.write_file(path, content)
     let policy = @runtime.Policy::load_file(path)
     assert_eq(
       compile("(module (func (export \"_start\")))").run(policy~),

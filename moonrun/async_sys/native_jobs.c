@@ -67,7 +67,7 @@ static void release_native_job(native_job *job) {
   free(job->path); free(job->buffer); free(job);
 }
 
-extern int32_t moonbitlang_async_fstatx_sync(native_fd, uint32_t, void *, int32_t);
+extern int32_t moonrun_native_fstatx_sync(native_fd, uint32_t, void *, int32_t);
 
 static void store32(unsigned char *buffer, uint32_t value) { memcpy(buffer, &value, 4); }
 static void store64(unsigned char *buffer, uint64_t value) { memcpy(buffer, &value, 8); }
@@ -347,7 +347,7 @@ static void *native_job_worker(void *pointer)
   } else {
   job->result = job->operation == STAT_PATH ? native_stat(job) :
                 job->operation == READ_DIRECTORY ? native_readdir(job) :
-                moonbitlang_async_fstatx_sync(job->parent, (uint32_t)job->request,
+                moonrun_native_fstatx_sync(job->parent, (uint32_t)job->request,
                                              job->buffer, job->capacity);
 #ifdef _WIN32
   job->error = job->result < 0 ? (int)GetLastError() : 0;
@@ -547,4 +547,162 @@ MOONBIT_FFI_EXPORT moonbit_bytes_t moonrun_tmp_path(void *path) {
   moonbit_bytes_t bytes = moonbit_make_bytes(length, 0);
   if (length) memcpy(bytes, path, (size_t)length);
   return bytes;
+}
+
+#include "operation.h"
+extern int moonrun_create_pipe(native_fd *, int, int);
+extern int moonrun_close_pipe(native_fd);
+extern void *moonrun_native_get_current_worker(void);
+extern int32_t moonrun_native_enter_cancellable_region(void *);
+extern void moonrun_native_leave_cancellable_region(void *);
+extern void moonrun_native_pause(int);
+#ifndef _WIN32
+#include <poll.h>
+#endif
+/* Resolver calls cannot reliably be interrupted on every platform. A cancelled
+ * lookup retains only its private C input/output and finishes independently. */
+static int cancellable_resolve(native_job *job) {
+  native_fd pipe[2];
+  if (moonrun_create_pipe(pipe, 0, 0) < 0) goto failed;
+#ifdef _WIN32
+  int length = (int)wcslen((WCHAR *)job->path) * 2;
+#else
+  int length = (int)strlen((char *)job->path);
+#endif
+  native_job *lookup = moonrun_native_job_start(RESOLVE_HOST, job->path, length,
+      (native_fd)-1, 0, 0, 0, pipe[1]);
+  moonrun_close_pipe(pipe[1]);
+  if (!lookup) { moonrun_close_pipe(pipe[0]); goto failed; }
+  for (;;) {
+    void *worker = moonrun_native_get_current_worker();
+    if (moonrun_native_enter_cancellable_region(worker)) {
+      moonrun_native_leave_cancellable_region(worker);
+      moonrun_native_job_detach(lookup);
+      moonrun_close_pipe(pipe[0]);
+#ifdef _WIN32
+      job->error = ERROR_OPERATION_ABORTED;
+#else
+      job->error = EINTR;
+#endif
+      return -1;
+    }
+#ifdef _WIN32
+    DWORD available;
+    int ready = !PeekNamedPipe(pipe[0], NULL, 0, NULL, &available, NULL) || available > 0;
+    if (!ready) moonrun_native_pause(1);
+#else
+    struct pollfd readiness = {pipe[0], POLLIN, 0};
+    int ready = poll(&readiness, 1, 10);
+#endif
+    moonrun_native_leave_cancellable_region(worker);
+    if (ready > 0) break;
+  }
+  moonrun_native_job_join(lookup);
+  moonrun_close_pipe(pipe[0]);
+  free(job->buffer);
+  job->buffer = lookup->buffer; lookup->buffer = NULL;
+  job->capacity = lookup->capacity;
+  job->error = lookup->error;
+  int result = lookup->result;
+  moonrun_native_job_free(lookup);
+  return result;
+failed:
+#ifdef _WIN32
+  job->error = GetLastError();
+#else
+  job->error = errno;
+#endif
+  return -1;
+}
+
+static int32_t run_metadata_operation(void *pointer, int32_t *error) {
+  native_job *job = pointer;
+  if (job->operation == RESOLVE_HOST) {
+    job->result = cancellable_resolve(job);
+  } else if (job->operation == READ_POLICY) {
+    job->result = native_read_policy(job);
+#ifdef _WIN32
+    job->error = job->result < 0 ? GetLastError() : 0;
+#else
+    job->error = job->result < 0 ? errno : 0;
+#endif
+  } else if (job->operation == OPEN_WATCHER) {
+#ifdef _WIN32
+    job->opened = CreateFileW((WCHAR *)job->path, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
+        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
+    job->result = job->opened == INVALID_HANDLE_VALUE ? -1 : 0;
+    job->error = job->result < 0 ? GetLastError() : 0;
+#else
+    job->result = -1; job->error = ENOTSUP;
+#endif
+  } else if (job->operation == READ_WATCH_EVENTS) {
+    job->result = native_watch_events(job);
+#ifdef _WIN32
+    job->error = job->result < 0 ? GetLastError() : 0;
+    if (job->error == ERROR_NOTIFY_ENUM_DIR) { job->result = 0; job->error = 0; }
+#else
+    job->error = job->result < 0 ? errno : 0;
+#endif
+  } else if (job->operation == ADD_WATCH) {
+#ifdef __linux__
+    job->result = inotify_add_watch(job->parent, (char *)job->path,
+        job->follow ? IN_CREATE | IN_MOVED_FROM | IN_MOVED_TO | IN_DELETE : IN_MODIFY);
+    job->error = job->result < 0 ? errno : 0;
+#else
+    job->result = -1;
+    job->error = 50;
+#endif
+  } else {
+  job->result = job->operation == STAT_PATH ? native_stat(job) :
+                job->operation == READ_DIRECTORY ? native_readdir(job) :
+                moonrun_native_fstatx_sync(job->parent, (uint32_t)job->request,
+                                             job->buffer, job->capacity);
+#ifdef _WIN32
+  job->error = job->result < 0 ? (int)GetLastError() : 0;
+#else
+  job->error = job->result < 0 ? errno : 0;
+#endif
+  }
+  *error = job->error;
+  return job->result;
+}
+static void free_metadata_operation(void *pointer) {
+  native_job *job = pointer;
+#ifdef _WIN32
+  if (job->opened != INVALID_HANDLE_VALUE) CloseHandle(job->opened);
+  if (job->cancel) CloseHandle(job->cancel);
+  if (job->event) CloseHandle(job->event);
+  if (job->wsa_lease) WSACleanup();
+#else
+  if (job->opened >= 0) close(job->opened);
+#endif
+  free(job->path); free(job->buffer);
+}
+static int32_t cancel_metadata_operation(void *pointer) {
+  moonrun_native_job_cancel(pointer);
+  return 1;
+}
+MOONBIT_FFI_EXPORT void *moonrun_operation_metadata(int operation, unsigned char *path, int length,
+    native_fd parent, int request, int capacity, int follow) {
+  native_job *job = moonrun_native_make_job(sizeof(*job), free_metadata_operation,
+      run_metadata_operation, cancel_metadata_operation);
+  memset(job, 0, sizeof(*job));
+  job->operation = operation; job->request = request; job->restart = follow;
+  job->opened = (native_fd)-1; job->capacity = capacity;
+  job->follow = follow; job->parent = parent;
+  job->path = calloc((size_t)length + 2, 1);
+  job->buffer = calloc(capacity ? capacity : 1, 1);
+  if (!job->path || !job->buffer) abort();
+  memcpy(job->path, path, length);
+#ifdef _WIN32
+  if (operation == RESOLVE_HOST) {
+    WSADATA data;
+    int error = WSAStartup(MAKEWORD(2, 2), &data);
+    if (error) job->error = error; else job->wsa_lease = 1;
+  }
+  job->event = CreateEventW(NULL, TRUE, FALSE, NULL);
+  job->cancel = CreateEventW(NULL, TRUE, FALSE, NULL);
+#endif
+  return moonrun_operation_wrap(job, NULL, 0, 30);
 }

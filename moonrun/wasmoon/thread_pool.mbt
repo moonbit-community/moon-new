@@ -16,14 +16,7 @@ fn Context::worker_import(
     "thread_pool/make_sleep_job" => {
       let duration = i32(args[0])
       guard duration >= 0 else { raise @vm.TypeMismatch }
-      [
-        I64(
-          host.new_job(() => {
-            @async.sleep(duration)
-            { ret: 0, errno: 0, data: b"", opened: None, }
-          }),
-        ),
-      ]
+      [I64(host.new_job(() => @resource.Task(@sys.sleep_job(duration))))]
     }
     "thread_pool/spawn_worker" | "thread_pool/spawn_worker_with_pipe" => {
       guard host.jobs.get(i64(args[1])) is Some(job) else {
@@ -116,7 +109,7 @@ fn Context::worker_import(
         host.async_errno = @sys.fault_errno
         return [I32(-1)]
       }
-      let completed = pool.fetch_completion(capacity)
+      let completed = host.fetch_completion(capacity)
       for index, id in completed {
         memory.store_i32_at(address + index.to_int64() * 4L, id)
       }
@@ -125,7 +118,7 @@ fn Context::worker_import(
     "thread_pool/errno_is_cancelled" =>
       [
         I32(
-          if i32(args[0]) == (if @async.platform is Windows { 995 } else { 4 }) {
+          if i32(args[0]) == (if @sys.platform is Windows { 995 } else { 4 }) {
             1
           } else {
             0

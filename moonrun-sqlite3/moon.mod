@@ -13,7 +13,3 @@ description = "Native SQLite bindings for the moonrun host."
 preferred_target = "native"
 
 supported_targets = "native"
-
-import {
-  "moonbitlang/async@0.22.4",
-}

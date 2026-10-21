@@ -1,11 +1,11 @@
 ///|
-pub async fn HostFs::authorize_path(
+pub fn HostFs::authorize_path(
   self : HostFs,
   path : String,
   read~ : Bool = true,
   write~ : Bool = false,
   entry~ : Bool = false,
-) -> Unit {
+) -> Unit raise {
   if self.policy is Some(policy) {
     let canonical = @policy.policy_path(path, entry)
     if !(canonical is Some(path) && policy.allows_path(path, read~, write~)) {
@@ -24,12 +24,12 @@ pub async fn HostFs::authorize_path(
 }
 
 ///|
-pub async fn HostFs::authorize_at(
+pub fn HostFs::authorize_at(
   self : HostFs,
   path : String,
   parent : @resource.Resource?,
   follow : Bool,
-) -> Unit {
+) -> Unit raise {
   if self.policy is None {
     return
   }
@@ -46,11 +46,11 @@ pub async fn HostFs::authorize_at(
 }
 
 ///|
-pub async fn HostFs::authorize_resource(
+pub fn HostFs::authorize_resource(
   self : HostFs,
   fd : @resource.Resource,
   write : Bool,
-) -> Unit {
+) -> Unit raise {
   if self.policy is None {
     return
   }

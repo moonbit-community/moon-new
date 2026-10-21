@@ -6,7 +6,7 @@ pub(all) enum ProcessHandle {
 
 ///|
 pub struct ExternalProcess {
-  fd : @types.Fd
+  fd : @sys.Fd
   priv mut references : Int32
 }
 
@@ -19,18 +19,15 @@ pub fn ExternalProcess::release(self : ExternalProcess) -> Unit {
 }
 
 ///|
-fn poll_process(
-  handle : @types.Fd,
-  pid : Int32,
-) -> Int32 raise @os_error.OSError {
-  if @async.platform is Windows {
+fn poll_process(handle : @sys.Fd, pid : Int32) -> Int32 raise @sys.OSError {
+  if @sys.platform is Windows {
     let ready = @sys.native_process_ready(handle)
     if ready <= 0 {
-      raise @os_error.OSError(
+      raise @sys.OSError(
         if ready == 0 {
           997
         } else {
-          @os_error.get_errno()
+          @sys.get_errno()
         },
         context="process readiness",
       )
@@ -38,7 +35,7 @@ fn poll_process(
   }
   let output = Ref(0)
   if @sys.native_process_result(handle, pid, output) < 0 {
-    raise @os_error.OSError(@os_error.get_errno(), context="process result")
+    raise @sys.OSError(@sys.get_errno(), context="process result")
   }
   output.val
 }
@@ -58,13 +55,16 @@ pub(all) struct SpawnOptions {
 ///|
 pub struct Child {
   native : @sys.NativeChild
+  priv pid : Int32
   identity : Int64
-  completion : FixedArray[@types.Fd]?
+  completion : FixedArray[@sys.Fd]?
   mut result : Int32?
   mut error : Int32
   mut consumed : Bool
   mut handles : Int32
   mut closed : Bool
+  orphan : Bool
+  priv streams : Array[ChildStream]
 }
 
 ///|
@@ -84,15 +84,19 @@ fn Child::close(self : Child) -> Unit {
     ignore(@sys.close_guest_pipe(pipe[0]))
     ignore(@sys.close_guest_pipe(pipe[1]))
   }
+  if !self.orphan {
+    @sys.child_signal(self.native, -1)
+    @sys.join_child(self.native)
+  }
   @sys.free_child(self.native)
 }
 
 ///|
-pub async fn HostProcess::signal(
+pub fn HostProcess::signal(
   self : HostProcess,
   pid : Int32,
   signal : Int32,
-) -> Unit {
+) -> Unit raise {
   guard self.children.get(pid) is Some(child) && !child.consumed else {
     if self.policy is None {
       @sys.signal_process_pid(pid, signal)

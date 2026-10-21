@@ -2,17 +2,17 @@
 package "moonbit-community/moonrun/policy"
 
 import {
-  "moonbitlang/async/socket",
+  "moonbit-community/moonrun/async_sys",
 }
 
 // Values
-pub fn address_ip(@socket.Addr) -> @socket.Addr raise
+pub fn address_ip(@async_sys.Addr) -> @async_sys.Addr raise
 
 pub fn dns_name(StringView) -> String
 
 pub fn invokes_moonx(String) -> Bool
 
-pub async fn policy_path(String, Bool) -> String?
+pub fn policy_path(String, Bool) -> String?
 
 // Errors
 
@@ -23,18 +23,18 @@ pub struct Policy {
 pub fn Policy::allows_lookup(Self, String) -> Bool
 pub fn Policy::allows_path(Self, String, read~ : Bool, write~ : Bool) -> Bool
 pub fn Policy::allows_process(Self, String, Array[String]) -> Bool
-pub fn Policy::allows_socket(Self, Bool, @socket.Addr, Int32) -> Bool
+pub fn Policy::allows_socket(Self, Bool, @async_sys.Addr, Int32) -> Bool
 pub fn Policy::environment(Self, Map[String, String]) -> Map[String, String] raise
-pub async fn Policy::from_inherited_handle(String) -> Self
-pub async fn Policy::from_json(String, source_dir? : String) -> Self
+pub fn Policy::from_inherited_handle(String) -> Self raise
+pub fn Policy::from_json(String, source_dir? : String) -> Self raise
 pub fn Policy::inherited_json(Self) -> String
-pub async fn Policy::load_file(String, source_dir? : String) -> Self
-pub fn Policy::resolved_connect_rules(Self, String, @socket.Addr) -> Array[SocketRule]
+pub fn Policy::load_file(String, source_dir? : String) -> Self raise
+pub fn Policy::resolved_connect_rules(Self, String, @async_sys.Addr) -> Array[SocketRule]
 
 pub struct SocketRule {
   // private fields
 }
-pub fn SocketRule::matches(Self, @socket.Addr, Int32) -> Bool
+pub fn SocketRule::matches(Self, @async_sys.Addr, Int32) -> Bool
 
 // Type aliases
 

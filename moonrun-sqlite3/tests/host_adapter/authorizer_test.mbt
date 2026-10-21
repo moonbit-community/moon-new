@@ -46,7 +46,7 @@ test "native authorizer receives its context and can be cleared" {
 }
 
 ///|
-async test "native authorizer works on the SQLite prepare worker" {
+test "native authorizer works on the SQLite prepare worker" {
   let database = open_database()
   defer @ffi.sqlite3_close(database) |> ignore
   assert_eq(

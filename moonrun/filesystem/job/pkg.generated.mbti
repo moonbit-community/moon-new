@@ -7,17 +7,17 @@ import {
 }
 
 // Values
-pub async fn open(@filesystem.HostFs, String, Int32, Int32, Bool, Int32, Int32, Int32, Int32) -> @resource.JobResult
+pub fn open(@filesystem.HostFs, String, Int32, Int32, Bool, Int32, Int32, Int32, Int32) -> @resource.Task raise
 
-pub async fn path_job(@filesystem.HostFs, PathOperation, String, Int32) -> @resource.JobResult
+pub fn path_job(@filesystem.HostFs, PathOperation, String, Int32) -> @resource.Task raise
 
-pub async fn read_directory(@resource.Resource, FixedArray[Byte], Int32, Bool) -> @resource.JobResult
+pub fn read_directory(@resource.Resource, FixedArray[Byte], Int32, Bool) -> @resource.Task raise
 
-pub async fn rename_or_symlink(@filesystem.HostFs, Bool, String, String, Bool) -> @resource.JobResult
+pub fn rename_or_symlink(@filesystem.HostFs, Bool, String, String, Bool) -> @resource.Task raise
 
-pub async fn resource_job(@filesystem.HostFs, @resource.Resource, ResourceOperation, Int32, Int32) -> @resource.JobResult
+pub fn resource_job(@filesystem.HostFs, @resource.Resource, ResourceOperation, Int32, Int32) -> @resource.Task raise
 
-pub async fn stat(@filesystem.HostFs, String, @resource.Resource?, Bool, Int32, Int32) -> @resource.JobResult
+pub fn stat(@filesystem.HostFs, String, @resource.Resource?, Bool, Int32, Int32) -> @resource.Task raise
 
 // Errors
 

@@ -15,6 +15,14 @@ test "$status" -eq 2
 status=0
 "$runner" > "$scratch/actual" 2> "$scratch/error" || status=$?
 test "$status" -eq 2
+for size in 0 -1 invalid 9223372036854775807; do
+  status=0
+  "$runner" --stack-size="$size" ignored.wasm > "$scratch/actual" 2> "$scratch/error" || status=$?
+  test "$status" -eq 2
+done
+status=0
+"$runner" --stack-size > "$scratch/actual" 2> "$scratch/error" || status=$?
+test "$status" -eq 2
 status=0
 "$runner" --policy deny.json ignored.wasm > "$scratch/actual" 2> "$scratch/error" || status=$?
 test "$status" -eq 1
@@ -36,6 +44,15 @@ for target in "${targets[@]}"; do
   test "$status" -eq 17
   status=0
   "$runner" "$program" -- --flag '中文' > "$scratch/actual" || status=$?
+  test "$status" -eq 17
+  cmp "$scratch/expected" "$scratch/actual"
+
+  status=0
+  "$runner" --stack-size 1024 --no-stack-trace "$program" -- --flag '中文' > "$scratch/actual" || status=$?
+  test "$status" -eq 17
+  cmp "$scratch/expected" "$scratch/actual"
+  status=0
+  "$runner" --stack-size=1024 "$program" -- --flag '中文' > "$scratch/actual" || status=$?
   test "$status" -eq 17
   cmp "$scratch/expected" "$scratch/actual"
 

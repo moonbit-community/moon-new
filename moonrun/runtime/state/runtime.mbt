@@ -24,7 +24,6 @@ pub fn Runtime::Runtime(
   stdin : (() -> Bytes)?,
   stdout : ((Bytes) -> Unit)?,
   stderr : ((Bytes) -> Unit)?,
-  group : @async.TaskGroup[@termination.RunOutcome],
   policy : @policy.Policy?,
   executable : String?,
 ) -> Runtime {
@@ -43,16 +42,16 @@ pub fn Runtime::Runtime(
     filesystem,
     sqlite: @sqlite.HostSqlite(filesystem, handles),
     network: @network.HostNetwork(policy, stdio),
-    process: @process.HostProcess(policy, stdio, handles, group),
-    async_host: @async_host.AsyncHost(handles, stdio, group),
+    process: @process.HostProcess(policy, stdio, handles),
+    async_host: @async_host.AsyncHost(handles, stdio),
   }
 }
 
 ///|
 pub fn Runtime::close(self : Runtime) -> Unit {
   self.sqlite.release_entered_mutexes()
-  self.process.close()
   self.async_host.close()
+  self.process.close()
   self.sqlite.close()
 }
 

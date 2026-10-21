@@ -27,30 +27,28 @@ fn Context::wasi_write(
     @vm.OutOfBoundsMemoryAccess => return [I32(@wasi.Errno::Fault.to_i32())]
     error => raise error
   }
-  self.suspend(() => {
-    let mut written = 0L
-    try {
-      for (offset, size) in ranges {
-        let mut sent = 0
-        while sent < size {
-          let length = Int32::min(size - sent, 65536)
-          let bytes = memory.read_bytes(
-            (offset + sent.to_int64()).to_int(),
-            length,
-          )
-          self.runtime.stdio.output(slot, bytes)
-          written += length.to_int64()
-          sent += length
-        }
+  let mut written = 0L
+  try {
+    for (offset, size) in ranges {
+      let mut sent = 0
+      while sent < size {
+        let length = Int32::min(size - sent, 65536)
+        let bytes = memory.read_bytes(
+          (offset + sent.to_int64()).to_int(),
+          length,
+        )
+        self.runtime.stdio.output(slot, bytes)
+        written += length.to_int64()
+        sent += length
       }
-    } catch {
-      @os_error.OSError(_, ..) =>
-        if written == 0L {
-          return [I32(@wasi.Errno::IO.to_i32())]
-        }
-      error => raise error
     }
-    memory.store_i32(result, written.to_int())
-    [I32(0)]
-  })
+  } catch {
+    @sys.OSError(_, ..) =>
+      if written == 0L {
+        return [I32(@wasi.Errno::IO.to_i32())]
+      }
+    error => raise error
+  }
+  memory.store_i32(result, written.to_int())
+  [I32(0)]
 }

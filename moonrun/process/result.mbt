@@ -5,10 +5,10 @@ pub fn HostProcess::get_result(
   self : HostProcess,
   handle : Int64,
   pid : Int32,
-) -> Int32 raise @os_error.OSError {
+) -> Int32 raise @sys.OSError {
   if handle == 0L ||
-    (handle == self.handles.invalid_fd && @async.platform is Windows) {
-    raise @os_error.OSError(@sys.bad_fd_errno, context="process handle")
+    (handle == self.handles.invalid_fd && @sys.platform is Windows) {
+    raise @sys.OSError(@sys.bad_fd_errno, context="process handle")
   }
   let child = if self.policy is None &&
     self.process_handles.get(handle) is Some(Child(child)) {
@@ -19,7 +19,7 @@ pub fn HostProcess::get_result(
   let child = child.filter(child => {
     !child.consumed ||
     (
-      @async.platform is Windows &&
+      @sys.platform is Windows &&
       self.process_handles.get(handle) is Some(Child(owner)) &&
       owner.identity == child.identity
     )
@@ -28,16 +28,16 @@ pub fn HostProcess::get_result(
     (self.process_handles.get(handle) is Some(External(_)) || child is None) {
     let fd = match self.process_handles.get(handle) {
       Some(External(process)) => process.fd
-      None if handle == self.handles.invalid_fd && !(@async.platform is Windows) =>
+      None if handle == self.handles.invalid_fd && !(@sys.platform is Windows) =>
         @sys.invalid_native_fd()
-      _ => raise @os_error.OSError(@sys.bad_fd_errno, context="process handle")
+      _ => raise @sys.OSError(@sys.bad_fd_errno, context="process handle")
     }
     return poll_process(fd, pid)
   }
   guard child is Some(child) else {
-    raise @os_error.OSError(
+    raise @sys.OSError(
       if self.policy is Some(_) {
-        if @async.platform is Windows {
+        if @sys.platform is Windows {
           5
         } else {
           13
@@ -51,13 +51,13 @@ pub fn HostProcess::get_result(
   if handle != self.handles.invalid_fd &&
     !(self.process_handles.get(handle) is Some(Child(owner)) &&
     owner.identity == child.identity) {
-    raise @os_error.OSError(@sys.bad_fd_errno, context="process provenance")
+    raise @sys.OSError(@sys.bad_fd_errno, context="process provenance")
   }
   guard child.result is Some(result) else {
-    raise @os_error.OSError(
-      if @async.platform is Windows {
+    raise @sys.OSError(
+      if @sys.platform is Windows {
         997
-      } else if @async.platform is MacOS {
+      } else if @sys.platform is MacOS {
         35
       } else {
         11
@@ -66,7 +66,7 @@ pub fn HostProcess::get_result(
     )
   }
   if child.error != 0 {
-    raise @os_error.OSError(child.error, context="child process")
+    raise @sys.OSError(child.error, context="child process")
   }
   child.consumed = true
   child.release_if_finished()

@@ -18,8 +18,8 @@ MOONBIT_FFI_EXPORT watcher_fd moonrun_watcher_create(void) {
 #ifdef _WIN32
   SetLastError(ERROR_NOT_SUPPORTED); return INVALID_HANDLE_VALUE;
 #elif defined(__APPLE__)
-  extern int moonbitlang_async_kqueue_watcher_create(void);
-  return moonbitlang_async_kqueue_watcher_create();
+  extern int moonrun_native_kqueue_watcher_create(void);
+  return moonrun_native_kqueue_watcher_create();
 #else
   return inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
 #endif
@@ -46,8 +46,8 @@ MOONBIT_FFI_EXPORT int moonrun_watcher_fetch(watcher_fd fd, unsigned char *buffe
 }
 MOONBIT_FFI_EXPORT int moonrun_watcher_add_file(watcher_fd watcher, watcher_fd fd, int directory) {
 #ifdef __APPLE__
-  extern int moonbitlang_async_kqueue_watcher_add_file(int, int, int);
-  return moonbitlang_async_kqueue_watcher_add_file(watcher, fd, directory);
+  extern int moonrun_native_kqueue_watcher_add_file(int, int, int);
+  return moonrun_native_kqueue_watcher_add_file(watcher, fd, directory);
 #else
   (void)watcher; (void)fd; (void)directory;
 #ifdef _WIN32

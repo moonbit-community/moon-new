@@ -66,10 +66,10 @@ fn ascii_lower(text : StringView) -> String {
 }
 
 ///|
-pub async fn Policy::from_json(
+pub fn Policy::from_json(
   contents : String,
   source_dir~ : String = @env.current_dir().unwrap_or("."),
-) -> Policy {
+) -> Policy raise {
   Policy::from_value(
     @json.parse(contents, reject_duplicate_keys=true),
     source_dir,
@@ -77,21 +77,17 @@ pub async fn Policy::from_json(
 }
 
 ///|
-async fn Policy::from_value(value : Json, source_dir : String) -> Policy {
+fn Policy::from_value(value : Json, source_dir : String) -> Policy raise {
   let fields = policy_fields(value, ["fs", "net", "env", "process"])
   let fs = policy_section(fields.get("fs"), ["read", "write"])
-  let roots = async fn(value : Json?) {
-    @async.all(
-      policy_strings(value).map(root => {
-        async fn() {
-          if root == "*" {
-            root
-          } else {
-            @fs.realpath(@working_directory.resolve_from(source_dir, root))
-          }
-        }
-      }),
-    )
+  let roots = fn(value : Json?) -> Array[String] raise {
+    policy_strings(value).map(root => {
+      if root == "*" {
+        root
+      } else {
+        @sys.realpath(@working_directory.resolve_from(source_dir, root))
+      }
+    })
   }
   let read = roots(fs.get("read"))
   let write = roots(fs.get("write"))

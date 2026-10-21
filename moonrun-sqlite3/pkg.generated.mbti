@@ -94,30 +94,34 @@ pub type Sqlite3Authorizer
 pub type Sqlite3AuthorizerContext
 
 type Sqlite3CleanupJob
+pub fn Sqlite3CleanupJob::notification_fd(Self) -> Int32
 pub fn Sqlite3CleanupJob::release(Self) -> Unit
 pub fn Sqlite3CleanupJob::result(Self) -> (Int32, Int32, String)
-pub async fn Sqlite3CleanupJob::wait(Self) -> Unit
+pub fn Sqlite3CleanupJob::wait(Self) -> Unit
 
 type Sqlite3Executor
 
 type Sqlite3OpenJob
-pub async fn Sqlite3OpenJob::discard(Self) -> Unit
+pub fn Sqlite3OpenJob::discard(Self) -> Unit
+pub fn Sqlite3OpenJob::notification_fd(Self) -> Int32
 pub fn Sqlite3OpenJob::release(Self) -> Unit
 pub fn Sqlite3OpenJob::result(Self) -> (Int32, Int32, String)
 pub fn Sqlite3OpenJob::take_database(Self) -> Sqlite3
-pub async fn Sqlite3OpenJob::wait(Self) -> Unit
+pub fn Sqlite3OpenJob::wait(Self) -> Unit
 
 type Sqlite3PrepareJob
-pub async fn Sqlite3PrepareJob::discard(Self) -> Unit
+pub fn Sqlite3PrepareJob::discard(Self) -> Unit
+pub fn Sqlite3PrepareJob::notification_fd(Self) -> Int32
 pub fn Sqlite3PrepareJob::release(Self) -> Unit
 pub fn Sqlite3PrepareJob::result(Self) -> (Int32, Int32, String, Int32)
 pub fn Sqlite3PrepareJob::take_statement(Self) -> Sqlite3Stmt
-pub async fn Sqlite3PrepareJob::wait(Self) -> Unit
+pub fn Sqlite3PrepareJob::wait(Self) -> Unit
 
 type Sqlite3StepJob
+pub fn Sqlite3StepJob::notification_fd(Self) -> Int32
 pub fn Sqlite3StepJob::release(Self) -> Unit
 pub fn Sqlite3StepJob::result(Self) -> (Int32, Int32, String, Int64?)
-pub async fn Sqlite3StepJob::wait(Self) -> Unit
+pub fn Sqlite3StepJob::wait(Self) -> Unit
 
 type Sqlite3Stmt
 

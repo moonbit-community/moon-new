@@ -1,0 +1,29 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moonrun-sqlite3/io"
+
+// Values
+pub fn pipe() -> (PipeRead, PipeWrite) raise PipeError
+
+// Errors
+pub suberror PipeError
+
+// Types and methods
+pub struct PipeRead {
+  descriptor : Int32
+  // private fields
+}
+pub fn PipeRead::close(Self) -> Unit
+pub fn PipeRead::fd(Self) -> Int32
+pub fn PipeRead::read(Self, FixedArray[Byte], max_len~ : Int32) -> Int32 raise PipeError
+
+pub struct PipeWrite {
+  descriptor : Int32
+  // private fields
+}
+pub fn PipeWrite::close(Self) -> Unit
+pub fn PipeWrite::fd(Self) -> Int32
+
+// Type aliases
+pub type Fd = Int32
+
+// Traits

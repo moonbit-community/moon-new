@@ -26,7 +26,9 @@ pub(all) struct IoResult {
   data : Bytes
   position : Int64
   flags : Int32
-  mut task : @async.Task[Unit]?
+  mut task : @sys.Worker?
+  mut work : Task?
+  mut resource : Resource?
   mut result : JobResult?
   mut pending : Bool
   mut fd : Int64?

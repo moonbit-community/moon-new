@@ -1,7 +1,7 @@
 // Compatibility regressions; original probes from moon/crates/moonrun/tests at 12e9d22e.
 
 ///|
-async test "console accepts non-null externref arguments" {
+test "console accepts non-null externref arguments" {
   let source =
     #|(module
     #| (import "console" "log" (func $log (param (ref extern))))
@@ -18,7 +18,7 @@ async test "console accepts non-null externref arguments" {
 }
 
 ///|
-async test "host signature adaptation still rejects incompatible types" {
+test "host signature adaptation still rejects incompatible types" {
   for
     source in [
       "(module (import \"console\" \"log\" (func (param i64))))", "(module (import \"ffi-bytes\" \"set\" (func (param externref i32 i32) (result i64))))",
@@ -35,7 +35,7 @@ async test "host signature adaptation still rejects incompatible types" {
 }
 
 ///|
-async test "in-memory module names do not supply an executable origin" {
+test "in-memory module names do not supply an executable origin" {
   let source =
     #|(module
     #| (import "moonbitlang/async" "c_buffer/is_null" (func $null (param i64) (result i32)))
@@ -51,7 +51,7 @@ async test "in-memory module names do not supply an executable origin" {
     @wat.parse(
       source
       .split("INVALID")
-      .join(if @async.platform is Windows { "87" } else { "22" }),
+      .join(if @sys.platform is Windows { "87" } else { "22" }),
     ),
   ).map(byte => byte.to_byte())
   assert_eq(
@@ -64,10 +64,10 @@ async test "in-memory module names do not supply an executable origin" {
 }
 
 ///|
-async test "file-backed executable origin survives removal and a different run cwd" {
-  let directory = @fs.tmpdir(prefix="moonrun-origin-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
-  @fs.mkdir(directory + "/other")
+test "file-backed executable origin survives removal and a different run cwd" {
+  let directory = @sys.tmpdir(prefix="moonrun-origin-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
+  @sys.mkdir(directory + "/other")
   let path = directory + "/café.wasm"
   let source = StringBuilder()
   source.write_string(
@@ -82,7 +82,7 @@ async test "file-backed executable origin survives removal and a different run c
     ),
   )
   for (name, expected) in [("exe", path), ("dir", directory)] {
-    let bytes = if @async.platform is Windows {
+    let bytes = if @sys.platform is Windows {
       @utf16.encode(expected + "\u0000", endianness=Little, bom=false)
     } else {
       @utf8.encode(expected + "\u0000")
@@ -101,8 +101,8 @@ async test "file-backed executable origin survives removal and a different run c
   let bytes = @encoder.encode(@wat.parse(source.to_string())).map(byte => {
     byte.to_byte()
   })
-  @fs.write_file(path, Bytes::from_array(bytes))
+  @sys.write_file(path, Bytes::from_array(bytes))
   let program = @runtime.Module::load_file(path)
-  @fs.remove(path)
+  @sys.remove(path)
   assert_eq(program.run(cwd=directory + "/other"), Completed)
 }

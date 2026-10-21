@@ -15,7 +15,7 @@ fn Context::socket(
 ///|
 fn Context::socket_status(self : Context, result : Int32) -> Array[@wasm.Value] {
   if result < 0 {
-    self.runtime.async_host.async_errno = @os_error.get_errno()
+    self.runtime.async_host.async_errno = @sys.get_errno()
   }
   [I32(result)]
 }
@@ -83,26 +83,26 @@ fn Context::socket_import(
   if name == "socket/make_tcp_socket" || name == "socket/make_udp_socket" {
     let family = i32(args[0])
     guard family == 4 || family == 6 else {
-      host.async_errno = if @async.platform is Windows { 87 } else { 22 }
+      host.async_errno = if @sys.platform is Windows { 87 } else { 22 }
       return [I64(self.runtime.handles.invalid_fd)]
     }
     let udp = name == "socket/make_udp_socket"
     let multicast = udp && i32(args[1]) != 0
-    return self.suspend(() => {
+    return {
       let fd = if udp {
         @sys.make_udp_socket(family, multicast)
       } else {
         @sys.make_tcp_socket(family)
       }
       if @sys.socket_invalid(fd) {
-        host.async_errno = @os_error.get_errno()
+        host.async_errno = @sys.get_errno()
         return [I64(self.runtime.handles.invalid_fd)]
       }
-      let resource = @resource.Resource::new_socket(fd, host.group)
+      let resource = @resource.Resource::new_socket(fd)
       let handle = self.runtime.handles.allocate()
       host.fds[handle] = resource
       [I64(handle)]
-    })
+    }
   }
   guard self.socket(args[0]) is Some(fd) else {
     return if name == "socket/accept/unix" {
@@ -139,56 +139,52 @@ fn Context::socket_import(
       | "socket/bind" => {
         let address = guest_bytes(caller, i32(args[1]), i32(args[2]))
         ignore(@sys.decode_address(address))
-        self.suspend(() => {
-          let result = if name == "socket/getsockname" {
-            @sys.socket_name(fd.native(), address)
-          } else {
-            try {
-              if name == "socket/bind" {
-                self.runtime.network.bind(fd, address)
-              } else {
-                self.runtime.network.connect(fd, address)
-              }
-              0
-            } catch {
-              @os_error.OSError(code, ..) => {
-                host.async_errno = code
-                return [I32(-1)]
-              }
-              error => raise error
+        let result = if name == "socket/getsockname" {
+          @sys.socket_name(fd.native(), address)
+        } else {
+          try {
+            if name == "socket/bind" {
+              self.runtime.network.bind(fd, address)
+            } else {
+              self.runtime.network.connect(fd, address)
             }
+            0
+          } catch {
+            @sys.OSError(code, ..) => {
+              host.async_errno = code
+              return [I32(-1)]
+            }
+            error => raise error
           }
-          if name == "socket/getsockname" && result >= 0 {
-            guest_memory(caller).init_data_at(
-              i32(args[1]).reinterpret_as_uint().to_int64(),
-              address,
-            )
-          }
-          self.socket_status(result)
-        })
-      }
-      "socket/accept/unix" => {
-        let address = guest_bytes(caller, i32(args[1]), i32(args[2]))
-        ignore(@sys.decode_address(address))
-        self.suspend(() => {
-          let accepted = @sys.accept_socket(
-            fd.native(),
-            address,
-            address.length(),
-          )
-          if @sys.socket_invalid(accepted) {
-            host.async_errno = @os_error.get_errno()
-            return [I64(self.runtime.handles.invalid_fd)]
-          }
-          let resource = @resource.Resource::new_socket(accepted, host.group)
-          let handle = self.runtime.handles.allocate()
-          host.fds[handle] = resource
+        }
+        if name == "socket/getsockname" && result >= 0 {
           guest_memory(caller).init_data_at(
             i32(args[1]).reinterpret_as_uint().to_int64(),
             address,
           )
-          [I64(handle)]
-        })
+        }
+        self.socket_status(result)
+      }
+      "socket/accept/unix" => {
+        let address = guest_bytes(caller, i32(args[1]), i32(args[2]))
+        ignore(@sys.decode_address(address))
+        let accepted = @sys.accept_socket(
+          fd.native(),
+          address,
+          address.length(),
+        )
+        if @sys.socket_invalid(accepted) {
+          host.async_errno = @sys.get_errno()
+          return [I64(self.runtime.handles.invalid_fd)]
+        }
+        let resource = @resource.Resource::new_socket(accepted)
+        let handle = self.runtime.handles.allocate()
+        host.fds[handle] = resource
+        guest_memory(caller).init_data_at(
+          i32(args[1]).reinterpret_as_uint().to_int64(),
+          address,
+        )
+        [I64(handle)]
       }
       "socket/recvfrom/unix" | "socket/sendto/unix" => {
         let receiving = name == "socket/recvfrom/unix"
@@ -202,39 +198,37 @@ fn Context::socket_import(
         let buffer = guest_bytes(caller, pointer.to_int(), length)
         let address = guest_bytes(caller, i32(args[4]), i32(args[5]))
         ignore(@sys.decode_address(address))
-        self.suspend(() => {
-          let result = if receiving {
-            let buffer = buffer.to_fixedarray()
-            let count = @sys.socket_recvfrom(
-              fd.native(),
-              buffer,
-              length,
-              0,
-              address,
-              address.length(),
+        let result = if receiving {
+          let buffer = buffer.to_fixedarray()
+          let count = @sys.socket_recvfrom(
+            fd.native(),
+            buffer,
+            length,
+            0,
+            address,
+            address.length(),
+          )
+          if count >= 0 {
+            guest_memory(caller).init_data_at(
+              pointer,
+              Bytes::from_array(buffer[:count]),
             )
-            if count >= 0 {
-              guest_memory(caller).init_data_at(
-                pointer,
-                Bytes::from_array(buffer[:count]),
-              )
-              guest_memory(caller).init_data_at(
-                i32(args[4]).reinterpret_as_uint().to_int64(),
-                address,
-              )
-            }
-            count
-          } else {
-            self.runtime.network.send_to(fd, buffer, address) catch {
-              @os_error.OSError(code, ..) => {
-                host.async_errno = code
-                return [I32(-1)]
-              }
-              error => raise error
-            }
+            guest_memory(caller).init_data_at(
+              i32(args[4]).reinterpret_as_uint().to_int64(),
+              address,
+            )
           }
-          self.socket_status(result)
-        })
+          count
+        } else {
+          self.runtime.network.send_to(fd, buffer, address) catch {
+            @sys.OSError(code, ..) => {
+              host.async_errno = code
+              return [I32(-1)]
+            }
+            error => raise error
+          }
+        }
+        self.socket_status(result)
       }
       _ => raise @vm.UnknownImport("moonbitlang/async", name)
     }
@@ -304,44 +298,42 @@ fn Context::windows_socket_import(
         errdefer placeholder.release()
         errdefer host.accepting.remove(target) |> ignore
         host.start_io(io, handle, i64(args[0]), fd => {
-          defer placeholder.release()
-          defer host.accepting.remove(target) |> ignore
           guard fd.owner is @resource.Socket(socket) else {
-            raise @os_error.OSError(@sys.bad_fd_errno, context="accept socket")
+            raise @sys.OSError(@sys.bad_fd_errno, context="accept socket")
           }
-          fd.read_lock.acquire()
-          defer fd.read_lock.release()
-          let peer = Bytes::make(length, 0)
-          let accepted = for ;; {
-            let sequence = socket.read_sequence
-            let accepted = @sys.accept_socket(socket.fd, peer, length)
-            if !@sys.socket_invalid(accepted) {
-              break accepted
-            }
-            let error = @os_error.OSError(
-              @os_error.get_errno(),
-              context="accept socket",
-            )
-            if error.is_EINTR() {
-              continue
-            }
-            if !error.is_nonblocking_io_error() {
-              raise error
-            }
-            socket.wait_read(sequence)
-          }
-          let resource = @resource.Resource::new_socket(accepted, host.group)
-          guard host.fds.contains(target) else {
-            resource.release()
-            raise @os_error.OSError(
-              @sys.bad_fd_errno,
-              context="closed accepted socket",
-            )
-          }
-          host.fds[target] = resource
-          placeholder.release()
-          io.peer = Some(peer)
-          { ret: 0, errno: 0, data: b"", opened: None, }
+          let operation = @sys.network_job(
+            4,
+            socket.fd,
+            Bytes::make(length, 0),
+            b"",
+            0,
+            0,
+          )
+          @resource.Task(
+            operation,
+            publish=() => {
+              let result = @resource.result(operation)
+              if result.ret < 0 {
+                return result
+              }
+              let resource = @resource.Resource::new_socket(operation.take_fd())
+              guard host.fds.contains(target) else {
+                resource.release()
+                raise @sys.OSError(
+                  @sys.bad_fd_errno,
+                  context="closed accepted socket",
+                )
+              }
+              host.fds[target] = resource
+              placeholder.release()
+              io.peer = Some(operation.peer())
+              result
+            },
+            cleanup=() => {
+              placeholder.release()
+              host.accepting.remove(target)
+            },
+          )
         })
       }
       guard result == -1 && io.pending else {

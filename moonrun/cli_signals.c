@@ -3,6 +3,7 @@
 #include <moonbit.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #ifdef _WIN32
 #include <windows.h>
 typedef HANDLE cli_fd;
@@ -129,4 +130,42 @@ MOONBIT_FFI_EXPORT void moonrun_cli_signal_close(void *pointer) {
   close(relay->write);
 #endif
   free(relay);
+}
+
+MOONBIT_FFI_EXPORT int moonrun_cli_signal_pipe(cli_fd *output) {
+#ifdef _WIN32
+  return CreatePipe(&output[0], &output[1], NULL, 0) ? 0 : -1;
+#else
+  if (pipe(output) < 0) return -1;
+  for (int index = 0; index < 2; ++index) {
+    if (fcntl(output[index], F_SETFD, FD_CLOEXEC) < 0 || fcntl(output[index], F_SETFL, O_NONBLOCK) < 0) {
+      int error = errno; close(output[0]); close(output[1]); errno = error; return -1;
+    }
+  }
+  return 0;
+#endif
+}
+MOONBIT_FFI_EXPORT int moonrun_cli_signal_read(cli_fd fd, unsigned char *buffer, int length) {
+#ifdef _WIN32
+  DWORD available, count;
+  if (!PeekNamedPipe(fd, NULL, 0, NULL, &available, NULL) || !available) return 0;
+  if (available < (DWORD)length) length = available;
+  return ReadFile(fd, buffer, length, &count, NULL) ? count : -1;
+#else
+  return (int)read(fd, buffer, length);
+#endif
+}
+MOONBIT_FFI_EXPORT void moonrun_native_terminate_process_by_signal(int signal_code) {
+  fflush(NULL);
+#ifdef _WIN32
+  (void)signal_code;
+  ExitProcess(STATUS_CONTROL_C_EXIT);
+#else
+  struct sigaction action = {0}; action.sa_handler = SIG_DFL;
+  sigemptyset(&action.sa_mask); sigaction(signal_code, &action, NULL);
+  sigset_t mask; sigemptyset(&mask); sigaddset(&mask, signal_code);
+  pthread_sigmask(SIG_UNBLOCK, &mask, NULL);
+  raise(signal_code);
+  _exit(128 + signal_code);
+#endif
 }

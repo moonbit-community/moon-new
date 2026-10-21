@@ -66,8 +66,8 @@ extern "c" fn sqlite3_open_job_impl(
   executor : Sqlite3ExecutorHandle,
   filename : Bytes,
   flags : Int32,
-  notification : @types.Fd,
-  discard_notification : @types.Fd,
+  notification : @pipe.Fd,
+  discard_notification : @pipe.Fd,
   rescode : Ref[Int32],
 ) -> Sqlite3JobHandle = "moonbit_sqlite3_open_job"
 
@@ -111,8 +111,8 @@ extern "c" fn sqlite3_prepare_job_impl(
   executor : Sqlite3ExecutorHandle,
   db : Sqlite3Handle,
   sql : String,
-  notification : @types.Fd,
-  discard_notification : @types.Fd,
+  notification : @pipe.Fd,
+  discard_notification : @pipe.Fd,
   rescode : Ref[Int32],
 ) -> Sqlite3JobHandle = "moonbit_sqlite3_prepare_job"
 
@@ -138,7 +138,7 @@ extern "c" fn sqlite3_step_job_impl(
   executor : Sqlite3ExecutorHandle,
   db : Sqlite3Handle,
   stmt : Sqlite3StmtHandle,
-  notification : @types.Fd,
+  notification : @pipe.Fd,
   rescode : Ref[Int32],
 ) -> Sqlite3JobHandle = "moonbit_sqlite3_step_job"
 

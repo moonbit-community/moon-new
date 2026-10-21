@@ -1,11 +1,6 @@
 import {
-  "moonbitlang/async",
-  "moonbitlang/async/os_error",
-  "moonbitlang/async/pipe",
+  "moonbit-community/moonrun/async_sys" @sys,
   "moonbit-community/moonrun/resource",
-  "moonbitlang/async/types",
-  "moonbitlang/core/encoding/utf16",
-  "moonbitlang/core/encoding/utf8",
 }
 
 options(

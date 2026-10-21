@@ -2,7 +2,6 @@
 pub(all) struct AsyncHost {
   handles : @handles.Handles
   stdio : @stdio.Stdio
-  group : @async.TaskGroup[@termination.RunOutcome]
   buffers : Map[Int64, FixedArray[Byte]]
   buses : Map[Int64, @sys.EventBus]
   fds : Map[Int64, @resource.Resource]
@@ -26,12 +25,10 @@ pub(all) struct AsyncHost {
 pub fn AsyncHost::AsyncHost(
   handles : @handles.Handles,
   stdio : @stdio.Stdio,
-  group : @async.TaskGroup[@termination.RunOutcome],
 ) -> AsyncHost {
   {
     handles,
     stdio,
-    group,
     buffers: Map([]),
     buses: Map([]),
     fds: Map([]),
@@ -53,8 +50,25 @@ pub fn AsyncHost::AsyncHost(
 }
 
 ///|
-// The owner calls close only after the task group has cancelled and joined tasks.
+// Stop native workers before releasing jobs, completion endpoints, or descriptors.
 pub fn AsyncHost::close(self : AsyncHost) -> Unit {
+  for _, io in self.io_results {
+    if io.task is Some(task) {
+      task.close()
+      io.task = None
+    }
+    if io.work is Some(work) {
+      work.close()
+      io.work = None
+    }
+    if io.resource is Some(fd) {
+      fd.release()
+      io.resource = None
+    }
+  }
+  for _, worker in self.workers {
+    worker.close()
+  }
   for _, bus in self.buses {
     bus.close()
   }
@@ -67,9 +81,6 @@ pub fn AsyncHost::close(self : AsyncHost) -> Unit {
     job.dispose()
   }
   self.jobs.clear()
-  for _, worker in self.workers {
-    worker.close()
-  }
   self.workers.clear()
   self.io_results.clear()
   self.address_info.clear()

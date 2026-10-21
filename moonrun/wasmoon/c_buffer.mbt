@@ -7,7 +7,7 @@ fn Context::buffer_import(
 ) -> Array[@wasm.Value] raise {
   let host = self.runtime.async_host
   match name {
-    "time/get_ms_since_epoch" => [I64(@async.now())]
+    "time/get_ms_since_epoch" => [I64(@sys.now())]
     "os_error/get_errno" => [I32(host.async_errno)]
     "c_buffer/is_null" =>
       [

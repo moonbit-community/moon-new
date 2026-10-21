@@ -1,6 +1,6 @@
 /* Child processes own their native inputs and notification writer. No worker
  * accesses MoonBit values or guest memory. The caller retains redirected fds
- * until the spawn acknowledgement, then a scoped task owns child cleanup. */
+ * until the spawn acknowledgement; the per-run process state owns child cleanup. */
 #ifndef _WIN32
 #define _GNU_SOURCE
 #endif
@@ -480,5 +480,149 @@ MOONBIT_FFI_EXPORT int moonrun_environment_key_equal(uint16_t *left, int left_le
   return CompareStringOrdinal((WCHAR *)left, left_len, (WCHAR *)right, right_len, TRUE) == CSTR_EQUAL;
 #else
   return left_len == right_len && memcmp(left, right, (size_t)left_len * 2) == 0;
+#endif
+}
+
+#include "operation.h"
+extern int moonrun_create_pipe(child_fd *, int, int);
+extern int moonrun_pipe_read(child_fd, unsigned char *, int);
+extern int moonrun_close_pipe(child_fd);
+struct spawn_operation {
+  guest_child *child;
+  child_fd read;
+  unsigned char *input, *policy;
+  child_fd stdio[3];
+  int length, argc, envc, orphan, no_console, policy_length;
+};
+static int32_t run_spawn_operation(void *pointer, int32_t *error) {
+  struct spawn_operation *job = pointer;
+  child_fd pipe[2];
+  if (moonrun_create_pipe(pipe, 0, 0) < 0) {
+#ifdef _WIN32
+    *error = GetLastError();
+#else
+    *error = errno;
+#endif
+    return -1;
+  }
+  job->read = pipe[0];
+  job->child = moonrun_child_start(job->input, job->length, job->argc, job->envc,
+    job->stdio[0], job->stdio[1], job->stdio[2], job->orphan, job->no_console,
+    pipe[1], job->policy, job->policy_length);
+  moonrun_close_pipe(pipe[1]);
+  if (!job->child) {
+#ifdef _WIN32
+    *error = GetLastError();
+#else
+    *error = errno;
+#endif
+    return -1;
+  }
+  unsigned char byte;
+  int count;
+  do { count = moonrun_pipe_read(job->read, &byte, 1); } while (count < 0 && errno == EINTR);
+  int pid = moonrun_child_pid(job->child);
+  *error = moonrun_child_error(job->child);
+  return pid;
+}
+static void free_spawn_operation(void *pointer) {
+  struct spawn_operation *job = pointer;
+  if (job->child) {
+    if (!job->orphan) { moonrun_child_signal(job->child, -1); moonrun_child_join(job->child); }
+    moonrun_child_free(job->child);
+  }
+  if (job->read != (child_fd)-1) moonrun_close_pipe(job->read);
+  free(job->input); free(job->policy);
+}
+MOONBIT_FFI_EXPORT void *moonrun_operation_spawn(unsigned char *input, int length, int argc, int envc,
+    child_fd in, child_fd out, child_fd err, int orphan, int no_console,
+    unsigned char *policy, int policy_length) {
+  struct spawn_operation *job = moonrun_native_make_job(sizeof(*job), free_spawn_operation, run_spawn_operation, NULL);
+  memset(job, 0, sizeof(*job));
+  job->read = (child_fd)-1;
+  job->input = malloc(length ? length : 1); job->policy = malloc(policy_length ? policy_length : 1);
+  if (!job->input || !job->policy) abort();
+  memcpy(job->input, input, length); memcpy(job->policy, policy, policy_length);
+  job->length = length; job->argc = argc; job->envc = envc;
+  job->stdio[0] = in; job->stdio[1] = out; job->stdio[2] = err;
+  job->orphan = orphan; job->no_console = no_console; job->policy_length = policy_length;
+  return moonrun_operation_wrap(job, NULL, 0, 32);
+}
+MOONBIT_FFI_EXPORT void *moonrun_operation_take_child(moonrun_operation *operation) {
+  struct spawn_operation *job = operation->job;
+  guest_child *child = job->child; job->child = NULL; return child;
+}
+MOONBIT_FFI_EXPORT child_fd moonrun_operation_take_child_pipe(moonrun_operation *operation) {
+  struct spawn_operation *job = operation->job;
+  child_fd read = job->read; job->read = (child_fd)-1; return read;
+}
+MOONBIT_FFI_EXPORT int moonrun_child_exited(void *pointer) {
+  guest_child *child = pointer; LOCK(child); int exited = child->exited; UNLOCK(child); return exited;
+}
+struct wait_child_operation { guest_child *child; child_fd fd; int pid; };
+static void free_wait_child_operation(void *pointer) { struct wait_child_operation *job = pointer; if (job->child) child_release(job->child); }
+extern void *moonrun_native_get_current_worker(void);
+extern int32_t moonrun_native_enter_cancellable_region(void *);
+extern void moonrun_native_leave_cancellable_region(void *);
+extern void moonrun_native_pause(int);
+extern int moonrun_native_get_process_result(child_fd, int, int32_t *);
+static int32_t run_wait_child_operation(void *pointer, int32_t *error) {
+  struct wait_child_operation *job = pointer;
+  for (;;) {
+    void *worker = moonrun_native_get_current_worker();
+    if (moonrun_native_enter_cancellable_region(worker)) {
+#ifdef _WIN32
+      *error = ERROR_OPERATION_ABORTED;
+#else
+      *error = EINTR;
+#endif
+      return -1;
+    }
+    if (job->child) {
+      if (moonrun_child_exited(job->child)) {
+        *error = moonrun_child_error(job->child);
+        return moonrun_child_status(job->child);
+      }
+    } else {
+      int32_t status;
+#ifdef _WIN32
+      if (moonrun_process_ready(job->fd) > 0 && moonrun_native_get_process_result(job->fd, job->pid, &status) == 0) return status;
+#else
+      if (moonrun_native_get_process_result(job->fd, job->pid, &status) == 0) return status;
+      if (errno != EAGAIN && errno != EWOULDBLOCK) { *error = errno; return -1; }
+#endif
+    }
+    moonrun_native_leave_cancellable_region(worker);
+    moonrun_native_pause(1);
+  }
+}
+MOONBIT_FFI_EXPORT void *moonrun_operation_wait_child(guest_child *child, child_fd fd, int pid) {
+  struct wait_child_operation *job = moonrun_native_make_job(sizeof(*job), free_wait_child_operation, run_wait_child_operation, NULL);
+  if (child) {
+#ifdef _WIN32
+    InterlockedIncrement(&child->references);
+#else
+    atomic_fetch_add(&child->references, 1);
+#endif
+  }
+  job->child = child; job->fd = fd; job->pid = pid;
+  return moonrun_operation_wrap(job, NULL, 0, 33);
+}
+MOONBIT_FFI_EXPORT void *moonrun_child_null(void) { return NULL; }
+
+#ifndef _WIN32
+#include <poll.h>
+#endif
+MOONBIT_FFI_EXPORT int moonrun_pipe_eof(child_fd fd) {
+#ifdef _WIN32
+  DWORD available;
+  if (PeekNamedPipe(fd, NULL, 0, NULL, &available, NULL)) return 0;
+  DWORD error = GetLastError();
+  return error == ERROR_BROKEN_PIPE || error == ERROR_PIPE_NOT_CONNECTED;
+#else
+  int available;
+  if (ioctl(fd, FIONREAD, &available) < 0 || available) return 0;
+  struct pollfd state = {fd, POLLIN, 0};
+  return poll(&state, 1, 0) > 0 && (state.revents & (POLLHUP | POLLERR));
 #endif
 }

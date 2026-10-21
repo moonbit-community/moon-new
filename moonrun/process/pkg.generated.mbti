@@ -5,11 +5,8 @@ import {
   "moonbit-community/moonrun/async_sys",
   "moonbit-community/moonrun/policy",
   "moonbit-community/moonrun/resource",
-  "moonbit-community/moonrun/run_termination",
   "moonbit-community/moonrun/runtime/handles",
   "moonbit-community/moonrun/runtime/stdio",
-  "moonbitlang/async",
-  "moonbitlang/async/os_error",
 }
 
 // Values
@@ -17,7 +14,7 @@ pub fn process_environment(Array[String], Array[(String, String)]) -> Array[Stri
 
 pub fn truncate_nul(String) -> String
 
-pub async fn wait_external(ProcessHandle?, Int32) -> @resource.JobResult
+pub fn wait_external(ProcessHandle?, Int32) -> @resource.Task
 
 // Errors
 
@@ -31,8 +28,10 @@ pub struct Child {
   mut consumed : Bool
   mut handles : Int32
   mut closed : Bool
+  orphan : Bool
+  // private fields
 }
-pub async fn Child::wait(Self) -> @resource.JobResult
+pub fn Child::wait(Self) -> @resource.Task
 
 pub(all) enum Environment {
   Entries(Array[EnvironmentEntry?])
@@ -61,14 +60,15 @@ pub struct HostProcess {
   process_handles : Map[Int64, ProcessHandle]
   // private fields
 }
-pub fn HostProcess::HostProcess(@policy.Policy?, @stdio.Stdio, @handles.Handles, @async.TaskGroup[@run_termination.RunOutcome]) -> Self
+pub fn HostProcess::HostProcess(@policy.Policy?, @stdio.Stdio, @handles.Handles) -> Self
 pub fn HostProcess::close(Self) -> Unit
 pub fn HostProcess::close_handle(Self, Int64) -> Bool
-pub fn HostProcess::get_result(Self, Int64, Int32) -> Int32 raise @os_error.OSError
-pub fn HostProcess::open_pid_handle(Self, Int32) -> Int64 raise @os_error.OSError
-pub fn HostProcess::publish_child(Self, Child) -> Int64 raise @os_error.OSError
-pub async fn HostProcess::signal(Self, Int32, Int32) -> Unit
-pub async fn HostProcess::spawn_child(Self, SpawnOptions) -> @resource.JobResult
+pub fn HostProcess::get_result(Self, Int64, Int32) -> Int32 raise @async_sys.OSError
+pub fn HostProcess::open_pid_handle(Self, Int32) -> Int64 raise @async_sys.OSError
+pub fn HostProcess::publish_child(Self, Child) -> Int64 raise @async_sys.OSError
+pub fn HostProcess::pump(Self) -> Unit raise
+pub fn HostProcess::signal(Self, Int32, Int32) -> Unit raise
+pub fn HostProcess::spawn_child(Self, SpawnOptions) -> @resource.Task raise
 
 pub(all) enum ProcessHandle {
   Child(Child)

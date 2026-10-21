@@ -1,19 +1,32 @@
 import {
-  "moonbitlang/async",
-  "moonbitlang/async/pipe",
-  "moonbitlang/async/socket",
-  "moonbitlang/async/types",
-  "moonbitlang/core/encoding/utf16",
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/string",
   "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/encoding/utf16",
 }
 
 options(
   supported_targets: "native",
   "native-stub": [
+    "file_util.c",
+    "types.c",
+    "error.c",
+    "fs.c",
+    "socket.c",
+    "process_handle.c",
+    "environment.c",
+    "worker.c",
+    "system.c",
     "event_bus.c",
     "native_jobs.c",
     "socket_io.c",
     "process.c",
     "watchers.c",
+    "watch_kqueue.c",
   ],
 )
+
+import {
+  "moonbitlang/core/cmp",
+} for "test"

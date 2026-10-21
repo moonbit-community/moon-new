@@ -8,7 +8,7 @@ priv enum DnsRule {
 ///|
 priv enum SocketHostRule {
   Any
-  Ip(@socket.Addr)
+  Ip(@sys.Addr)
   Name(DnsRule)
 }
 
@@ -54,7 +54,7 @@ fn DnsRule::matches(self : DnsRule, name : String) -> Bool {
 }
 
 ///|
-pub fn address_ip(address : @socket.Addr) -> @socket.Addr raise {
+pub fn address_ip(address : @sys.Addr) -> @sys.Addr raise {
   let text = address.to_string()
   if address.is_ipv6() {
     let end = text.find("]").unwrap()
@@ -63,9 +63,9 @@ pub fn address_ip(address : @socket.Addr) -> @socket.Addr raise {
       Some(index) => host[:index].to_owned()
       None => host
     }
-    @socket.Addr::parse("[\{host}]:0")
+    @sys.Addr::parse("[\{host}]:0")
   } else {
-    @socket.Addr::new(address.ip(), 0)
+    @sys.Addr::new(address.ip(), 0)
   }
 }
 
@@ -97,7 +97,7 @@ fn SocketRule::parse(text : String) -> SocketRule raise {
     SocketHostRule::Any
   } else {
     let parsed = Some(
-      @socket.Addr::parse(
+      @sys.Addr::parse(
         if host.contains_char(':') {
           "[\{host}]:0"
         } else {
@@ -105,7 +105,7 @@ fn SocketRule::parse(text : String) -> SocketRule raise {
         },
       ),
     ) catch {
-      @socket.InvalidAddr => None
+      @sys.InvalidAddr => None
       error => raise error
     }
     match parsed {
@@ -119,7 +119,7 @@ fn SocketRule::parse(text : String) -> SocketRule raise {
 ///|
 pub fn SocketRule::matches(
   self : SocketRule,
-  ip : @socket.Addr,
+  ip : @sys.Addr,
   port : Int32,
 ) -> Bool {
   (self.port is None || self.port == Some(port)) &&
@@ -137,7 +137,7 @@ fn SocketRule::allows_lookup(self : SocketRule, name : String) -> Bool {
     Name(pattern) => pattern.matches(name)
     Ip(ip) => {
       let address = Some(
-        @socket.Addr::parse(
+        @sys.Addr::parse(
           if name.contains_char(':') {
             "[\{name}]:0"
           } else {
@@ -178,7 +178,7 @@ fn SocketRule::text(self : SocketRule) -> String {
 pub fn Policy::allows_socket(
   self : Policy,
   bind : Bool,
-  ip : @socket.Addr,
+  ip : @sys.Addr,
   port : Int32,
 ) -> Bool {
   let rules = if bind { self.bind } else { self.connect }
@@ -195,7 +195,7 @@ pub fn Policy::allows_lookup(self : Policy, name : String) -> Bool {
 pub fn Policy::resolved_connect_rules(
   self : Policy,
   name : String,
-  ip : @socket.Addr,
+  ip : @sys.Addr,
 ) -> Array[SocketRule] {
   self.connect.filter_map(rule => {
     if rule.host is Name(pattern) && pattern.matches(name) {

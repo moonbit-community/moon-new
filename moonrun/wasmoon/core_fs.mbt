@@ -177,105 +177,103 @@ fn Context::filesystem(
       } else {
         b""
       }
-      self.suspend(async fn() {
-        let result : Array[@wasm.Value] = try {
-          match name {
-            "read_file_to_string" =>
-              [self.put(Text(filesystem.read_file_to_string(path)))]
-            "read_file_to_bytes_new" => {
-              self.filesystem_results.file_content = filesystem.read_file_to_bytes(
-                path,
-              )
+      let result : Array[@wasm.Value] = try {
+        match name {
+          "read_file_to_string" =>
+            [self.put(Text(filesystem.read_file_to_string(path)))]
+          "read_file_to_bytes_new" => {
+            self.filesystem_results.file_content = filesystem.read_file_to_bytes(
+              path,
+            )
+            [I32(0)]
+          }
+          "write_string_to_file"
+          | "write_bytes_to_file"
+          | "write_bytes_to_file_new" => {
+            filesystem.write_file(path, contents)
+            if name == "write_bytes_to_file_new" {
               [I32(0)]
+            } else {
+              []
             }
+          }
+          "create_dir" | "create_dir_new" => {
+            filesystem.create_dir(path)
+            if name == "create_dir_new" {
+              [I32(0)]
+            } else {
+              []
+            }
+          }
+          "remove_file" | "remove_file_new" => {
+            filesystem.remove_file(path)
+            if name == "remove_file_new" {
+              [I32(0)]
+            } else {
+              []
+            }
+          }
+          "remove_dir" | "remove_dir_new" => {
+            filesystem.remove_dir(path)
+            if name == "remove_dir_new" {
+              [I32(0)]
+            } else {
+              []
+            }
+          }
+          "read_dir" | "read_dir_new" => {
+            let entries = filesystem.read_dir(path)
+            if name == "read_dir_new" {
+              self.filesystem_results.directory_entries = entries
+              [I32(0)]
+            } else {
+              [self.put(Strings(entries))]
+            }
+          }
+          "is_file" | "is_file_new" =>
+            [I32(if filesystem.is_file(path) { 1 } else { 0 })]
+          "is_dir" | "is_dir_new" =>
+            [I32(if filesystem.is_dir(path) { 1 } else { 0 })]
+          "path_exists" =>
+            [I32(if filesystem.path_exists(path) { 1 } else { 0 })]
+          _ => raise @vm.UnknownImport("__moonbit_fs_unstable", name)
+        }
+      } catch {
+        @sys.OSError(_, ..) as error => {
+          let message = "\{error}"
+          let context = match name {
+            "read_file_to_string" | "read_file_to_bytes_new" =>
+              "Failed to read file"
             "write_string_to_file"
             | "write_bytes_to_file"
-            | "write_bytes_to_file_new" => {
-              filesystem.write_file(path, contents)
-              if name == "write_bytes_to_file_new" {
-                [I32(0)]
-              } else {
-                []
-              }
-            }
-            "create_dir" | "create_dir_new" => {
-              filesystem.create_dir(path)
-              if name == "create_dir_new" {
-                [I32(0)]
-              } else {
-                []
-              }
-            }
-            "remove_file" | "remove_file_new" => {
-              filesystem.remove_file(path)
-              if name == "remove_file_new" {
-                [I32(0)]
-              } else {
-                []
-              }
-            }
-            "remove_dir" | "remove_dir_new" => {
-              filesystem.remove_dir(path)
-              if name == "remove_dir_new" {
-                [I32(0)]
-              } else {
-                []
-              }
-            }
-            "read_dir" | "read_dir_new" => {
-              let entries = filesystem.read_dir(path)
-              if name == "read_dir_new" {
-                self.filesystem_results.directory_entries = entries
-                [I32(0)]
-              } else {
-                [self.put(Strings(entries))]
-              }
-            }
-            "is_file" | "is_file_new" =>
-              [I32(if filesystem.is_file(path) { 1 } else { 0 })]
-            "is_dir" | "is_dir_new" =>
-              [I32(if filesystem.is_dir(path) { 1 } else { 0 })]
-            "path_exists" =>
-              [I32(if filesystem.path_exists(path) { 1 } else { 0 })]
-            _ => raise @vm.UnknownImport("__moonbit_fs_unstable", name)
+            | "write_bytes_to_file_new" => "Failed to write file"
+            "create_dir" | "create_dir_new" => "Failed to create directory"
+            "read_dir" | "read_dir_new" => "Failed to read directory"
+            "remove_file" | "remove_file_new" => "Failed to remove file"
+            "remove_dir" | "remove_dir_new" => "Failed to remove directory"
+            _ => ""
           }
-        } catch {
-          @os_error.OSError(_, ..) as error => {
-            let message = "\{error}"
-            let context = match name {
-              "read_file_to_string" | "read_file_to_bytes_new" =>
-                "Failed to read file"
-              "write_string_to_file"
-              | "write_bytes_to_file"
-              | "write_bytes_to_file_new" => "Failed to write file"
-              "create_dir" | "create_dir_new" => "Failed to create directory"
-              "read_dir" | "read_dir_new" => "Failed to read directory"
-              "remove_file" | "remove_file_new" => "Failed to remove file"
-              "remove_dir" | "remove_dir_new" => "Failed to remove directory"
-              _ => ""
-            }
-            let diagnostic = if context.is_empty() {
-              "\{message}: \{requested}"
-            } else {
-              "\{context} \{requested}: \{message}"
-            }
-            if name.has_suffix("_new") {
-              self.filesystem_results.error_message = diagnostic
-              [I32(-1)]
-            } else if name == "is_file" || name == "is_dir" {
-              [I32(0)]
-            } else {
-              raise @vm.AsyncHostError(diagnostic)
-            }
+          let diagnostic = if context.is_empty() {
+            "\{message}: \{requested}"
+          } else {
+            "\{context} \{requested}: \{message}"
           }
-          @utf8.Malformed(_) =>
-            raise @vm.AsyncHostError(
-              "Failed to read file \{requested}: stream did not contain valid UTF-8",
-            )
-          error => raise error
+          if name.has_suffix("_new") {
+            self.filesystem_results.error_message = diagnostic
+            [I32(-1)]
+          } else if name == "is_file" || name == "is_dir" {
+            [I32(0)]
+          } else {
+            raise @vm.AsyncHostError(diagnostic)
+          }
         }
-        result
-      })
+        @utf8.Malformed(_) =>
+          raise @vm.AsyncHostError(
+            "Failed to read file \{requested}: stream did not contain valid UTF-8",
+          )
+        error => raise error
+      }
+      result
     }
   }
 }

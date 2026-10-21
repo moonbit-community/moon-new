@@ -1,5 +1,5 @@
 ///|
-async test "policies reject unknown fields and malformed authorization rules" {
+test "policies reject unknown fields and malformed authorization rules" {
   for
     source in [
       "{\"unknown\":{}}", "{\"fs\":{\"read\":null}}", "{\"net\":{\"bind\":[\"localhost:*\"]}}",
@@ -18,7 +18,7 @@ async test "policies reject unknown fields and malformed authorization rules" {
 }
 
 ///|
-async test "policy environment provisioning starts empty and is isolated per run" {
+test "policy environment provisioning starts empty and is isolated per run" {
   let source =
     #|(module
     #| (import "__moonbit_fs_unstable" "get_env_var_exists" (func $exists (param externref) (result i32)))
@@ -43,12 +43,12 @@ async test "policy environment provisioning starts empty and is isolated per run
 }
 
 ///|
-async test "file policy permits one canonical root and blocks outside targets" {
-  let directory = @fs.tmpdir(prefix="moonrun-policy-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
-  @fs.mkdir(directory + "/allowed")
-  @fs.write_file(directory + "/allowed/input", "permitted")
-  @fs.write_file(directory + "/outside", "secret")
+test "file policy permits one canonical root and blocks outside targets" {
+  let directory = @sys.tmpdir(prefix="moonrun-policy-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
+  @sys.mkdir(directory + "/allowed")
+  @sys.write_file(directory + "/allowed/input", "permitted")
+  @sys.write_file(directory + "/outside", "secret")
   let source =
     #|(module
     #| (import "__moonbit_fs_unstable" "read_file_to_bytes_new" (func $read (param externref) (result i32)))
@@ -75,8 +75,8 @@ async test "file policy permits one canonical root and blocks outside targets" {
     }),
     Completed,
   )
-  assert_eq(@fs.read_file(directory + "/outside").text(), "secret")
-  assert_true(@fs.exists(directory + "/allowed/new"))
+  assert_eq(@sys.read_file_to_string(directory + "/outside"), "secret")
+  assert_true(@sys.exists(directory + "/allowed/new"))
   assert_true(
     @utf8.decode(Bytes::from_array(diagnostics)).contains(
       "Sandbox policy blocked file read",
@@ -85,7 +85,7 @@ async test "file policy permits one canonical root and blocks outside targets" {
 }
 
 ///|
-async test "socket bind denial returns errno and permitted bind executes once" {
+test "socket bind denial returns errno and permitted bind executes once" {
   let source =
     #|(module
     #| (import "moonbitlang/async" "socket/make_udp_socket" (func $socket (param i32 i32) (result i64)))
@@ -106,7 +106,7 @@ async test "socket bind denial returns errno and permitted bind executes once" {
     )
     .replace(
       old="PERMISSION",
-      new=if @async.platform is Windows { "5" } else { "13" },
+      new=if @sys.platform is Windows { "5" } else { "13" },
     ),
   )
   assert_eq(denied_program.run(policy=denied, stderr=_ => ()), Completed)
@@ -122,12 +122,12 @@ async test "socket bind denial returns errno and permitted bind executes once" {
 }
 
 ///|
-async test "recursive removal unlinks a root symlink without deleting its target" {
-  let directory = @fs.tmpdir(prefix="moonrun-policy-link-")
-  defer @fs.rmdir(directory, recursive=true) |> ignore
-  @fs.mkdir(directory + "/allowed")
-  @fs.mkdir(directory + "/outside")
-  @fs.write_file(directory + "/outside/sentinel", "preserved")
+test "recursive removal unlinks a root symlink without deleting its target" {
+  let directory = @sys.tmpdir(prefix="moonrun-policy-link-")
+  defer @sys.rmdir(directory, recursive=true) |> ignore
+  @sys.mkdir(directory + "/allowed")
+  @sys.mkdir(directory + "/outside")
+  @sys.write_file(directory + "/outside/sentinel", "preserved")
   let policy = @runtime.Policy::from_json(
     "{\"fs\":{\"write\":[\"allowed\"]}}",
     source_dir=directory,
@@ -138,15 +138,15 @@ async test "recursive removal unlinks a root symlink without deleting its target
     #| (import "_" "allowed/link" (global $path externref))
     #| (func (export "_start") global.get $path call $remove if unreachable end))
   for suffix in ["", "/", "////"] {
-    @fs.symlink(target=directory + "/outside", directory + "/allowed/link")
+    @sys.symlink(target=directory + "/outside", directory + "/allowed/link")
     let program = compile(
       source.replace(old="allowed/link", new="allowed/link" + suffix),
     )
     assert_eq(program.run(cwd=directory, policy~), Completed)
     assert_eq(
-      @fs.read_file(directory + "/outside/sentinel").text(),
+      @sys.read_file_to_string(directory + "/outside/sentinel"),
       "preserved",
     )
-    assert_true(!@fs.exists(directory + "/allowed/link"))
+    assert_true(!@sys.exists(directory + "/allowed/link"))
   }
 }

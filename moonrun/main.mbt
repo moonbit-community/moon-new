@@ -1,12 +1,12 @@
 ///|
-async fn main {
+fn main raise {
   let inherited_policy = if @env.get_env_var("MOONRUN_INHERITED_POLICY")
     is Some(token) {
     @env.unset_env_var("MOONRUN_INHERITED_POLICY")
     Some(@runtime.Policy::from_inherited_handle(token)) catch {
       error => {
-        @stdio.stderr.write("Error: inherited policy: \{error}\n")
-        @sys.exit(2)
+        @sys.stderr.write("Error: inherited policy: \{error}\n")
+        @system.exit(2)
         return
       }
     }
@@ -15,24 +15,26 @@ async fn main {
   }
   let args = @env.args()[1:].to_owned()
   if args.is_empty() {
-    @stdio.stderr.write("Error: a Wasm path is required\n")
-    @sys.exit(2)
+    @sys.stderr.write("Error: a Wasm path is required\n")
+    @system.exit(2)
     return
   }
   if args[0] == "--help" || args[0] == "-h" {
-    @stdio.stdout.write(
-      "Usage: moonrun [OPTIONS] <PATH> [ARGS]...\n\nOptions:\n  --test-args <JSON>  Execute MoonBit tests\n  --policy <PATH>    Restrict core/async host access (WASI is not covered)\n  --policy-source-dir <PATH>  Resolve relative policy filesystem roots here\n  --no-stack-trace    Omit guest stack traces\n  -h, --help         Print help\n  -V, --version      Print version\n",
+    @sys.stdout.write(
+      "Usage: moonrun [OPTIONS] <PATH> [ARGS]...\n\nOptions:\n  --test-args <JSON>  Execute MoonBit tests\n  --policy <PATH>    Restrict core/async host access (WASI is not covered)\n  --policy-source-dir <PATH>  Resolve relative policy filesystem roots here\n  --stack-size <KiB>  Guest stack size (default: 16384)\n  --no-stack-trace    Omit guest stack traces\n  -h, --help         Print help\n  -V, --version      Print version\n",
     )
     return
   }
   if args[0] == "--version" || args[0] == "-V" {
-    @stdio.stdout.write("moonrun 0.1.0 (Wasmoon)\n")
+    @sys.stdout.write("moonrun 0.1.0 (Wasmoon)\n")
     return
   }
   let mut path = None
   let mut test_args = None
   let mut policy_path = None
   let mut policy_source_dir = None
+  let mut stack_size = 16384L
+  let mut no_stack_trace = false
   let guest_args = []
   let mut after_separator = false
   for i = 0; i < args.length(); {
@@ -51,8 +53,8 @@ async fn main {
       policy_source_dir = Some(arg[20:].to_owned())
     } else if arg == "--policy" || arg == "--policy-source-dir" {
       guard args.get(i + 1) is Some(value) else {
-        @stdio.stderr.write("Error: \{arg} requires a value\n")
-        @sys.exit(2)
+        @sys.stderr.write("Error: \{arg} requires a value\n")
+        @system.exit(2)
         return
       }
       if arg == "--policy" {
@@ -62,27 +64,42 @@ async fn main {
       }
       continue i + 2
     } else if arg == "--stack-size" || arg.has_prefix("--stack-size=") {
-      // FIXME: Honor byte-based budgets when Wasmoon exposes accounting:
-      // https://github.com/Milky2018/wasmoon/issues/546
-      @stdio.stderr.write("Error: \{arg} is not supported by this runner yet\n")
-      @sys.exit(2)
-      return
+      let (value, next) = if arg == "--stack-size" {
+        guard args.get(i + 1) is Some(value) else {
+          @sys.stderr.write("Error: --stack-size requires a value\n")
+          @system.exit(2)
+          return
+        }
+        (value, i + 2)
+      } else {
+        (arg[13:].to_owned(), i + 1)
+      }
+      let parsed = @string.parse_int64(value) catch { _ => 0L }
+      guard parsed > 0L && parsed <= 9223372036854775807L / 1024L else {
+        @sys.stderr.write(
+          "Error: --stack-size must be a positive KiB value that fits in bytes\n",
+        )
+        @system.exit(2)
+        return
+      }
+      stack_size = parsed
+      continue next
     } else if arg.has_prefix("--test-args=") {
       test_args = Some(arg[12:].to_owned())
     } else if arg == "--no-stack-trace" {
-      ()
+      no_stack_trace = true
     } else if arg == "--test-args" {
       guard args.get(i + 1) is Some(value) else {
-        @stdio.stderr.write("Error: --test-args requires a value\n")
-        @sys.exit(2)
+        @sys.stderr.write("Error: --test-args requires a value\n")
+        @system.exit(2)
         return
       }
       test_args = Some(value)
       continue i + 2
     } else if path is None {
       if arg.has_prefix("-") {
-        @stdio.stderr.write("Error: unknown option \{arg}\n")
-        @sys.exit(2)
+        @sys.stderr.write("Error: unknown option \{arg}\n")
+        @system.exit(2)
         return
       }
       path = Some(arg)
@@ -92,13 +109,13 @@ async fn main {
     continue i + 1
   }
   guard path is Some(path) else {
-    @stdio.stderr.write("Error: a Wasm path is required\n")
-    @sys.exit(2)
+    @sys.stderr.write("Error: a Wasm path is required\n")
+    @system.exit(2)
     return
   }
   if policy_source_dir is Some(_) && policy_path is None {
-    @stdio.stderr.write("Error: --policy-source-dir requires --policy\n")
-    @sys.exit(2)
+    @sys.stderr.write("Error: --policy-source-dir requires --policy\n")
+    @system.exit(2)
     return
   }
   let code = try {
@@ -114,7 +131,10 @@ async fn main {
         }
     }
     let program = @runtime.Module::load_file(path)
-    match run_cli(program, guest_args, test_args, policy) {
+    match
+      run_cli(
+        program, guest_args, test_args, policy, stack_size, no_stack_trace,
+      ) {
       Completed => 0
       Exited(code) => code
       Signaled(signal) => {
@@ -122,15 +142,15 @@ async fn main {
         128 + signal
       }
       Trapped(message) => {
-        @stdio.stderr.write("Error: \{message}\n")
+        @sys.stderr.write("Error: \{message}\n")
         1
       }
     }
   } catch {
     error => {
-      @stdio.stderr.write("Error: \{error}\n")
+      @sys.stderr.write("Error: \{error}\n")
       1
     }
   }
-  @sys.exit(code)
+  @system.exit(code)
 }

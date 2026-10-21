@@ -1,7 +1,7 @@
 // Compatibility regressions; original probes from moon/crates/moonrun/tests at 12e9d22e.
 
 ///|
-async test "sanitizer checks lifetime duplicate allocations and final leaks" {
+test "sanitizer checks lifetime duplicate allocations and final leaks" {
   let source =
     #|(module
     #| (import "moonbit:ffi/memory-sanitizer" "register-object-alloc" (func $alloc (param i32 i32)))
@@ -46,7 +46,7 @@ async test "sanitizer checks lifetime duplicate allocations and final leaks" {
 }
 
 ///|
-async test "host leak diagnostics are opt-in and run before cleanup" {
+test "host leak diagnostics are opt-in and run before cleanup" {
   let source =
     #|(module
     #| (import "moonbitlang/async" "event_bus/create" (func $new (result i64)))
@@ -72,7 +72,7 @@ async test "host leak diagnostics are opt-in and run before cleanup" {
 }
 
 ///|
-async test "realpath result is borrowed from its job and published once" {
+test "realpath result is borrowed from its job and published once" {
   let source =
     #|(module
     #| (import "moonbitlang/async" "thread_pool/make_realpath_job" (func $new (param i32 i32) (result i64)))
@@ -102,7 +102,7 @@ async test "realpath result is borrowed from its job and published once" {
 }
 
 ///|
-async test "nullable handles use the reserved runtime null" {
+test "nullable handles use the reserved runtime null" {
   let source =
     #|(module
     #|                    (import "moonbitlang/sqlite" "sqlite3_null_handle" (func $null (result i64)))
@@ -130,7 +130,7 @@ async test "nullable handles use the reserved runtime null" {
 }
 
 ///|
-async test "TLS free rejects a numeric zero handle" {
+test "TLS free rejects a numeric zero handle" {
   let source =
     #|(module
     #|                    (import "moonbitlang/async" "tls/connection/free" (func $free (param i64)))

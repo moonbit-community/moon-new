@@ -3,7 +3,7 @@ package "moonbit-community/moonrun/wasmoon"
 
 import {
   "Milky2018/wasm_core/types",
-  "Milky2018/wasmoon/runtime",
+  "Milky2018/wasmoon_runtime/runtime",
   "moonbit-community/moonrun/run_termination",
   "moonbit-community/moonrun/runtime/state",
 }
@@ -16,9 +16,9 @@ import {
 pub struct Context {
   // private fields
 }
-pub fn Context::Context(@state.Runtime) -> Self
+pub fn Context::Context(@state.Runtime, poll? : () -> Unit raise) -> Self
 pub fn Context::close(Self) -> Unit
-pub async fn Context::execute(Self, @runtime.Linker, @types.Module, Array[(String, Array[(UInt32, UInt32)])]?) -> @run_termination.RunOutcome
+pub fn Context::execute(Self, @runtime.Linker, @types.Module, Array[(String, Array[(UInt32, UInt32)])]?, stack_size? : Int64, no_stack_trace? : Bool) -> @run_termination.RunOutcome raise
 
 // Type aliases
 

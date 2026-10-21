@@ -6,9 +6,11 @@ import {
 }
 
 // Values
-pub async fn packed_stat(Int32, Int32, Int32) -> Bytes
+pub fn make_native_job(NativeJobKind, String, Int32, Int32, Int32, Bool) -> @resource.Task raise
 
-pub async fn run_native_job(NativeJobKind, String, Int32, Int32, Int32, Bool) -> @resource.JobResult
+pub fn packed_stat(Int32, Int32, Int32) -> Bytes raise
+
+pub fn run_native_job(NativeJobKind, String, Int32, Int32, Int32, Bool) -> @resource.JobResult raise
 
 pub fn stat_length(Int32, Int32) -> Int32 raise
 

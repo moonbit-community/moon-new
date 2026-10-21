@@ -7,7 +7,7 @@ extern "c" fn cleanup_job_create(
   executor : Sqlite3ExecutorHandle,
   database : Sqlite3Handle,
   statement : Sqlite3StmtHandle,
-  notification : @types.Fd,
+  notification : @pipe.Fd,
   rescode : Ref[Int32],
 ) -> Sqlite3JobHandle = "moonrun_sqlite3_cleanup_job_create"
 
@@ -63,7 +63,7 @@ fn new_cleanup_job(
 
 ///|
 /// Await completion under cancellation protection; cleanup itself is not cancelled.
-pub async fn Sqlite3CleanupJob::wait(self : Sqlite3CleanupJob) -> Unit {
+pub fn Sqlite3CleanupJob::wait(self : Sqlite3CleanupJob) -> Unit {
   self.0.wait()
 }
 
@@ -78,4 +78,9 @@ pub fn Sqlite3CleanupJob::result(
 pub fn Sqlite3CleanupJob::release(self : Sqlite3CleanupJob) -> Unit {
   self.0.close_notification()
   cleanup_job_release(self.0.handle)
+}
+
+///|
+pub fn Sqlite3CleanupJob::notification_fd(self : Sqlite3CleanupJob) -> @pipe.Fd {
+  self.0.notification.unwrap().fd()
 }

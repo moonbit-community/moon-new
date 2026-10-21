@@ -1,9 +1,4 @@
-/* Per-guest native event storage and a blocking-wait bridge.
- * The async library's native event bus uses a process-global event buffer;
- * using it from a worker would race the embedding application's event loop.
- * Workers below own only C memory and OS handles. Notification is delivered
- * through an ordinary async pipe, without installing an external event loop.
- */
+/* Per-run synchronous IOCP/kqueue/epoll storage. Workers publish through OS notifications. */
 #include <moonbit.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -19,6 +14,7 @@ typedef OVERLAPPED_ENTRY poll_event;
 #else
 #include <fcntl.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <unistd.h>
 #if defined(__APPLE__)
 #include <sys/event.h>
@@ -31,11 +27,11 @@ typedef struct epoll_event poll_event;
 typedef int poll_handle;
 #endif
 
-extern char *moonbitlang_async_errno_to_string(int);
-extern void moonbitlang_async_free_errno_str(void *);
+extern char *moonrun_native_errno_to_string(int);
+extern void moonrun_native_free_errno_str(void *);
 
 MOONBIT_FFI_EXPORT moonbit_bytes_t moonrun_error_message(int code) {
-  char *message = moonbitlang_async_errno_to_string(code);
+  char *message = moonrun_native_errno_to_string(code);
 #ifdef _WIN32
   size_t length = (wcslen((wchar_t *)message) + 1) * sizeof(wchar_t);
 #else
@@ -43,69 +39,26 @@ MOONBIT_FFI_EXPORT moonbit_bytes_t moonrun_error_message(int code) {
 #endif
   moonbit_bytes_t bytes = moonbit_make_bytes((int32_t)length, 0);
   memcpy(bytes, message, length);
-  moonbitlang_async_free_errno_str(message);
+  moonrun_native_free_errno_str(message);
   return bytes;
 }
 
 #define EVENT_CAPACITY 1024
 typedef struct {
   poll_handle poll;
-  poll_handle notify;
 #ifdef _WIN32
-  HANDLE worker;
-  HANDLE notify_event;
-  CRITICAL_SECTION mutex;
-  CONDITION_VARIABLE command;
+  volatile LONG references, closed;
+#else
+  _Atomic int references, closed;
+#endif
+#ifdef _WIN32
   WSAEVENT socket_event;
   SOCKET socket;
   int socket_flags;
-#else
-  pthread_t worker;
-  pthread_mutex_t mutex;
-  pthread_cond_t command;
-#if defined(__linux__)
-  int wake;
 #endif
-#endif
-  int stopping;
-  int pending;
-  int timeout;
-  int count;
-  int error;
+  int count, error;
   poll_event events[EVENT_CAPACITY];
 } guest_event_bus;
-
-#ifdef _WIN32
-static void lock_bus(guest_event_bus *bus) { EnterCriticalSection(&bus->mutex); }
-static void unlock_bus(guest_event_bus *bus) { LeaveCriticalSection(&bus->mutex); }
-static void signal_command(guest_event_bus *bus) { WakeConditionVariable(&bus->command); }
-static void wait_command(guest_event_bus *bus) {
-  SleepConditionVariableCS(&bus->command, &bus->mutex, INFINITE);
-}
-#else
-static void lock_bus(guest_event_bus *bus) { pthread_mutex_lock(&bus->mutex); }
-static void unlock_bus(guest_event_bus *bus) { pthread_mutex_unlock(&bus->mutex); }
-static void signal_command(guest_event_bus *bus) { pthread_cond_signal(&bus->command); }
-static void wait_command(guest_event_bus *bus) { pthread_cond_wait(&bus->command, &bus->mutex); }
-#endif
-
-static void wake_poll(guest_event_bus *bus) {
-#ifdef _WIN32
-  if (bus->socket_event) { WSASetEvent(bus->socket_event); return; }
-  PostQueuedCompletionStatus(bus->poll, 0, 0, NULL);
-#elif defined(__APPLE__)
-  struct kevent event;
-  EV_SET(&event, 0, EVFILT_USER, 0, NOTE_TRIGGER, 0, NULL);
-  int result;
-  do { result = kevent(bus->poll, &event, 1, NULL, 0, NULL); }
-  while (result < 0 && errno == EINTR);
-#else
-  uint64_t value = 1;
-  int result;
-  do { result = (int)write(bus->wake, &value, sizeof(value)); }
-  while (result < 0 && errno == EINTR);
-#endif
-}
 
 static int wait_poll(guest_event_bus *bus, int timeout) {
 #ifdef _WIN32
@@ -148,127 +101,23 @@ static int wait_poll(guest_event_bus *bus, int timeout) {
 #endif
 }
 
-static int notify_completion(guest_event_bus *bus) {
-  unsigned char byte = 1;
-#ifdef _WIN32
-  OVERLAPPED operation = {0};
-  ResetEvent(bus->notify_event);
-  // Suppress completion packets on the host loop: this OVERLAPPED belongs to
-  // this worker, not to async's IoHandle completion registry.
-  operation.hEvent = (HANDLE)((uintptr_t)bus->notify_event | 1);
-  DWORD written;
-  BOOL success = WriteFile(bus->notify, &byte, 1, &written, &operation);
-  if (!success && GetLastError() == ERROR_IO_PENDING)
-    success = GetOverlappedResult(bus->notify, &operation, &written, TRUE);
-  if (success && written == 1) return 1;
-  bus->error = (int)GetLastError();
-  CloseHandle(bus->notify);
-  bus->notify = NULL;
-#else
-  // There is exactly one unread byte per wait, so the pipe cannot fill.
-  ssize_t result;
-  do { result = write(bus->notify, &byte, 1); }
-  while (result < 0 && errno == EINTR);
-  if (result == 1) return 1;
-  bus->error = errno;
-  close(bus->notify);
-  bus->notify = -1;
-#endif
-  // The native duplicate is the sole writer. Closing it delivers EOF to the
-  // async reader instead of leaving a waiter stranded after a failed write.
-  return 0;
-}
-
-#ifdef _WIN32
-static DWORD WINAPI event_worker(void *pointer)
-#else
-static void *event_worker(void *pointer)
-#endif
-{
-  guest_event_bus *bus = pointer;
-  lock_bus(bus);
-  for (;;) {
-    while (!bus->stopping && !bus->pending) wait_command(bus);
-    if (bus->stopping) break;
-    int timeout = bus->timeout;
-    unlock_bus(bus);
-    int count = wait_poll(bus, timeout);
-    lock_bus(bus);
-    if (bus->stopping) break;
-    bus->count = count;
-    bus->pending = 0;
-    // Publish under the mutex before notifying. Keeping the lock through the
-    // write prevents a new request from overtaking its previous notification.
-    if (!notify_completion(bus)) break;
-  }
-  unlock_bus(bus);
-#ifdef _WIN32
-  return 0;
-#else
-  return NULL;
-#endif
-}
-
-MOONBIT_FFI_EXPORT void *moonrun_event_bus_create(poll_handle notify) {
+MOONBIT_FFI_EXPORT void *moonrun_event_bus_create(poll_handle unused) {
+  (void)unused;
   guest_event_bus *bus = calloc(1, sizeof(*bus));
   if (!bus) return NULL;
+  bus->references = 1;
 #ifdef _WIN32
   bus->poll = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
-  if (!bus->poll) goto fail;
-  if (!DuplicateHandle(GetCurrentProcess(), notify, GetCurrentProcess(),
-                       &bus->notify, 0, FALSE, DUPLICATE_SAME_ACCESS)) goto fail_poll;
-  bus->notify_event = CreateEventW(NULL, TRUE, FALSE, NULL);
-  if (!bus->notify_event) goto fail_notify;
-  InitializeCriticalSection(&bus->mutex);
-  InitializeConditionVariable(&bus->command);
-  bus->worker = CreateThread(NULL, 0, event_worker, bus, 0, NULL);
-  if (bus->worker) return bus;
-  DeleteCriticalSection(&bus->mutex);
-  CloseHandle(bus->notify_event);
-fail_notify:
-  CloseHandle(bus->notify);
-fail_poll:
-  CloseHandle(bus->poll);
-fail:
-  free(bus);
-  return NULL;
-#else
-  bus->notify = fcntl(notify, F_DUPFD_CLOEXEC, 0);
-  if (bus->notify < 0) goto fail;
-#if defined(__APPLE__)
+  if (!bus->poll) { free(bus); return NULL; }
+#elif defined(__APPLE__)
   bus->poll = kqueue();
-  if (bus->poll < 0) goto fail_notify;
-  int flags = fcntl(bus->poll, F_GETFD);
-  if (flags < 0 || fcntl(bus->poll, F_SETFD, flags | FD_CLOEXEC) < 0) goto fail_poll;
-  struct kevent event;
-  EV_SET(&event, 0, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, NULL);
-  if (kevent(bus->poll, &event, 1, NULL, 0, NULL) < 0) goto fail_poll;
+  if (bus->poll < 0) { free(bus); return NULL; }
+  if (fcntl(bus->poll, F_SETFD, FD_CLOEXEC) < 0) { close(bus->poll); free(bus); return NULL; }
 #else
   bus->poll = epoll_create1(EPOLL_CLOEXEC);
-  if (bus->poll < 0) goto fail_notify;
-  bus->wake = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-  if (bus->wake < 0) goto fail_poll;
-  struct epoll_event event = { .events = EPOLLIN, .data.u64 = 0 };
-  if (epoll_ctl(bus->poll, EPOLL_CTL_ADD, bus->wake, &event) < 0) goto fail_wake;
+  if (bus->poll < 0) { free(bus); return NULL; }
 #endif
-  if (pthread_mutex_init(&bus->mutex, NULL) != 0) goto fail_wake;
-  if (pthread_cond_init(&bus->command, NULL) != 0) goto fail_mutex;
-  if (pthread_create(&bus->worker, NULL, event_worker, bus) == 0) return bus;
-  pthread_cond_destroy(&bus->command);
-fail_mutex:
-  pthread_mutex_destroy(&bus->mutex);
-fail_wake:
-#if defined(__linux__)
-  close(bus->wake);
-#endif
-fail_poll:
-  close(bus->poll);
-fail_notify:
-  close(bus->notify);
-fail:
-  free(bus);
-  return NULL;
-#endif
+  return bus;
 }
 
 MOONBIT_FFI_EXPORT int moonrun_event_bus_is_null(void *bus) { return bus == NULL; }
@@ -291,30 +140,11 @@ MOONBIT_FFI_EXPORT int moonrun_event_bus_watch_socket(void *pointer, poll_handle
 
 MOONBIT_FFI_EXPORT void moonrun_event_bus_begin(void *pointer, int timeout) {
   guest_event_bus *bus = pointer;
-  lock_bus(bus);
-  bus->timeout = timeout;
-  bus->pending = 1;
-  bus->count = 0;
   bus->error = 0;
-  signal_command(bus);
-  unlock_bus(bus);
+  bus->count = wait_poll(bus, timeout);
 }
-
-MOONBIT_FFI_EXPORT int moonrun_event_bus_result(void *pointer) {
-  guest_event_bus *bus = pointer;
-  lock_bus(bus);
-  int result = bus->count;
-  unlock_bus(bus);
-  return result;
-}
-
-MOONBIT_FFI_EXPORT int moonrun_event_bus_errno(void *pointer) {
-  guest_event_bus *bus = pointer;
-  lock_bus(bus);
-  int result = bus->error;
-  unlock_bus(bus);
-  return result;
-}
+MOONBIT_FFI_EXPORT int moonrun_event_bus_result(void *pointer) { return ((guest_event_bus *)pointer)->count; }
+MOONBIT_FFI_EXPORT int moonrun_event_bus_errno(void *pointer) { return ((guest_event_bus *)pointer)->error; }
 
 MOONBIT_FFI_EXPORT int moonrun_event_bus_register(
     void *pointer, poll_handle fd, int read_only, int64_t key) {
@@ -423,6 +253,7 @@ MOONBIT_FFI_EXPORT int moonrun_event_bus_register_completion(void *pointer, poll
 MOONBIT_FFI_EXPORT int moonrun_event_bus_post(void *pointer, int64_t key, int64_t token, int bytes) {
 #ifdef _WIN32
   guest_event_bus *bus = pointer;
+  if (InterlockedCompareExchange(&bus->closed, 0, 0)) return 0;
   // The token is an opaque guest operation ID, never dereferenced as a pointer.
   return PostQueuedCompletionStatus(bus->poll, (DWORD)bytes, (ULONG_PTR)key,
                                    (OVERLAPPED *)(uintptr_t)token) ? 0 : -1;
@@ -461,21 +292,23 @@ MOONBIT_FFI_EXPORT int moonrun_completion_drain(poll_handle fd) {
 
 MOONBIT_FFI_EXPORT int moonrun_pipe_read(poll_handle fd, unsigned char *data, int length) {
 #ifdef _WIN32
-  (void)fd; (void)data; (void)length;
-  SetLastError(ERROR_NOT_SUPPORTED);
-  return -1;
+DWORD count;
+if (ReadFile(fd, data, (DWORD)length, &count, NULL)) return (int)count;
+return GetLastError() == ERROR_BROKEN_PIPE ? 0 : -1;
 #else
   return (int)read(fd, data, (size_t)length);
 #endif
 }
 
+#ifndef _WIN32
+extern int moonrun_native_safe_write(int, const void *, int);
+#endif
 MOONBIT_FFI_EXPORT int moonrun_pipe_write(poll_handle fd, unsigned char *data, int length) {
 #ifdef _WIN32
-  (void)fd; (void)data; (void)length;
-  SetLastError(ERROR_NOT_SUPPORTED);
-  return -1;
+DWORD count;
+return WriteFile(fd, data, (DWORD)length, &count, NULL) ? (int)count : -1;
 #else
-  return (int)write(fd, data, (size_t)length);
+  return moonrun_native_safe_write(fd, data, length);
 #endif
 }
 
@@ -537,6 +370,9 @@ MOONBIT_FFI_EXPORT int moonrun_create_pipe(poll_handle *fds, int read_async, int
       if (flags < 0 || fcntl(fds[i], F_SETFL, flags | O_NONBLOCK) < 0) goto fail;
     }
   }
+#ifdef __APPLE__
+  if (fcntl(fds[1], F_SETNOSIGPIPE, 1) < 0) goto fail;
+#endif
   return 0;
 fail: {
     int error = errno;
@@ -548,35 +384,41 @@ fail: {
 #endif
 }
 
-MOONBIT_FFI_EXPORT void moonrun_event_bus_close(void *pointer) {
+/* A worker retains native storage through its last completion. Logical guest
+ * close prevents new posts; the OS handle is released after all workers join. */
+void moonrun_event_bus_retain(void *pointer) {
+  if (!pointer) return;
   guest_event_bus *bus = pointer;
-  lock_bus(bus);
-  bus->stopping = 1;
-  signal_command(bus);
-  unlock_bus(bus);
-  wake_poll(bus);
 #ifdef _WIN32
-  WaitForSingleObject(bus->worker, INFINITE);
+  InterlockedIncrement(&bus->references);
+#else
+  atomic_fetch_add(&bus->references, 1);
+#endif
+}
+void moonrun_event_bus_release(void *pointer) {
+  if (!pointer) return;
+  guest_event_bus *bus = pointer;
+#ifdef _WIN32
+  if (InterlockedDecrement(&bus->references)) return;
   if (bus->socket_event) {
     WSAEventSelect(bus->socket, NULL, 0);
     WSACloseEvent(bus->socket_event);
   }
-  CloseHandle(bus->worker);
-  if (bus->notify) CloseHandle(bus->notify);
-  CloseHandle(bus->notify_event);
   CloseHandle(bus->poll);
-  DeleteCriticalSection(&bus->mutex);
 #else
-  pthread_join(bus->worker, NULL);
-  pthread_cond_destroy(&bus->command);
-  pthread_mutex_destroy(&bus->mutex);
-  if (bus->notify >= 0) close(bus->notify);
-#if defined(__linux__)
-  close(bus->wake);
-#endif
+  if (atomic_fetch_sub(&bus->references, 1) != 1) return;
   close(bus->poll);
 #endif
   free(bus);
+}
+MOONBIT_FFI_EXPORT void moonrun_event_bus_close(void *pointer) {
+  guest_event_bus *bus = pointer;
+#ifdef _WIN32
+  InterlockedExchange(&bus->closed, 1);
+#else
+  atomic_store(&bus->closed, 1);
+#endif
+  moonrun_event_bus_release(bus);
 }
 
 MOONBIT_FFI_EXPORT int moonrun_event_bus_register_pid(void *pointer, int pid) {
@@ -599,9 +441,11 @@ MOONBIT_FFI_EXPORT int moonrun_event_bus_register_pid(void *pointer, int pid) {
 
 MOONBIT_FFI_EXPORT int moonrun_fd_nonblocking(poll_handle fd) {
 #ifdef _WIN32
-  (void)fd; SetLastError(ERROR_NOT_SUPPORTED); return -1;
+  DWORD mode = PIPE_NOWAIT;
+  return SetNamedPipeHandleState(fd, &mode, NULL, NULL) ? 0 : -1;
 #else
   int flags = fcntl(fd, F_GETFL);
   return flags < 0 ? -1 : fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 #endif
 }
+MOONBIT_FFI_EXPORT void *moonrun_event_bus_null(void) { return NULL; }

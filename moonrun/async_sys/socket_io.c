@@ -107,9 +107,9 @@ MOONBIT_FFI_EXPORT moonbit_bytes_t moonrun_gai_message(int code) {
 #ifdef _WIN32
 #include <wchar.h>
 #endif
-extern void *moonbitlang_async_if_indextoname(socket_fd, uint32_t);
+extern void *moonrun_native_if_indextoname(socket_fd, uint32_t);
 MOONBIT_FFI_EXPORT moonbit_bytes_t moonrun_interface_name(socket_fd fd, uint32_t index) {
-  void *name = moonbitlang_async_if_indextoname(fd, index);
+  void *name = moonrun_native_if_indextoname(fd, index);
   if (!name) {
 #ifdef _WIN32
     int error = WSAGetLastError();

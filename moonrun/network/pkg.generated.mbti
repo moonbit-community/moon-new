@@ -16,12 +16,12 @@ pub struct HostNetwork {
   // private fields
 }
 pub fn HostNetwork::HostNetwork(@policy.Policy?, @stdio.Stdio) -> Self
-pub async fn HostNetwork::bind(Self, @resource.Resource, Bytes) -> Unit
-pub async fn HostNetwork::bind_job(Self, @resource.Resource, Bytes) -> @resource.JobResult
-pub async fn HostNetwork::connect(Self, @resource.Resource, Bytes) -> Unit
-pub async fn HostNetwork::perform_socket_io(Self, @resource.IoResult, @resource.Resource) -> @resource.JobResult
-pub async fn HostNetwork::resolve_hostname(Self, String) -> @resource.JobResult
-pub async fn HostNetwork::send_to(Self, @resource.Resource, Bytes, Bytes) -> Int32
+pub fn HostNetwork::bind(Self, @resource.Resource, Bytes) -> Unit raise
+pub fn HostNetwork::bind_job(Self, @resource.Resource, Bytes) -> @resource.Task raise
+pub fn HostNetwork::connect(Self, @resource.Resource, Bytes) -> Unit raise
+pub fn HostNetwork::perform_socket_io(Self, @resource.IoResult, @resource.Resource) -> @resource.Task raise
+pub fn HostNetwork::resolve_hostname(Self, String) -> @resource.Task raise
+pub fn HostNetwork::send_to(Self, @resource.Resource, Bytes, Bytes) -> Int32 raise
 
 // Type aliases
 

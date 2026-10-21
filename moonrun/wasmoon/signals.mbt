@@ -9,10 +9,10 @@ fn Context::signal_import(
   match name {
     "signal/get_signal_by_index" => {
       let signal = match i32(args[0]) {
-        0 => @signal.Signal::SIGINT
-        1 => @signal.Signal::SIGTERM
-        2 => @signal.Signal::SIGHUP
-        3 => @signal.Signal::SIGBREAK
+        0 => @sys.Signal::SIGINT
+        1 => @sys.Signal::SIGTERM
+        2 => @sys.Signal::SIGHUP
+        3 => @sys.Signal::SIGBREAK
         _ => return [I32(-1)]
       }
       [I32(signal.to_int())]
@@ -71,21 +71,40 @@ fn Context::legacy_signal_job(
   for index in 0..<count {
     interests.add(@sys.buffer_word(bytes, index * 4, 4).to_int())
   }
-  let waiter = @async_host.SignalWaiter::{
-    interests,
-    ready: @cond_var.Cond(),
-    signal: None,
-  }
   let key = self.runtime.handles.allocate()
   [
     I64(
       host.new_job(() => {
-        host.signal_waiters[key] = waiter
-        defer host.signal_waiters.remove(key) |> ignore
-        while waiter.signal is None {
-          waiter.ready.wait()
+        let pipes = FixedArray::make(2, @sys.invalid_native_fd())
+        if @sys.create_guest_pipe(pipes, false, true) < 0 {
+          @sys.check_errno("signal waiter")
         }
-        { ret: waiter.signal.unwrap(), errno: 0, data: b"", opened: None, }
+        let waiter : @async_host.SignalWaiter = {
+          interests,
+          write: pipes[1],
+          signal: None,
+        }
+        host.signal_waiters[key] = waiter
+        let operation = @sys.read_job(pipes[0], 4, -1L)
+        @resource.Task(
+          operation,
+          publish=() => {
+            let result = @resource.result(operation)
+            {
+              ..result,
+              ret: if result.ret == 4 {
+                @sys.buffer_word(result.data.to_fixedarray(), 0, 4).to_int()
+              } else {
+                result.ret
+              },
+            }
+          },
+          cleanup=() => {
+            host.signal_waiters.remove(key)
+            ignore(@sys.close_guest_pipe(pipes[0]))
+            ignore(@sys.close_guest_pipe(pipes[1]))
+          },
+        )
       }),
     ),
   ]

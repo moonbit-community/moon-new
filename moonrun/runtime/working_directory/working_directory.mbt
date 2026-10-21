@@ -1,7 +1,7 @@
 ///|
 pub fn resolve_from(directory : String, path : String) -> String {
   // Leave empty names and symlink/.. resolution to the native filesystem.
-  match (@async.platform, path) {
+  match (@sys.platform, path) {
     (_, "") => path
     (Windows, ['a'..<='z' | 'A'..<='Z', ':', ..])
     | (Windows, ['\\' | '/', '\\' | '/', ..])
@@ -17,7 +17,7 @@ pub fn resolve_from(directory : String, path : String) -> String {
     }
     _ => {
       let separator = if directory.has_suffix("/") ||
-        (@async.platform is Windows && directory.has_suffix("\\")) {
+        (@sys.platform is Windows && directory.has_suffix("\\")) {
         ""
       } else {
         @path.sep.to_string()
