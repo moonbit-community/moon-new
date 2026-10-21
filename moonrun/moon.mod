@@ -6,7 +6,7 @@ license = "Apache-2.0"
 
 repository = "https://github.com/moonbit-community/moon-new"
 
-readme = "README.mbt.md"
+readme = "README.md"
 
 description = "A MoonBit WebAssembly runner powered by Wasmoon."
 

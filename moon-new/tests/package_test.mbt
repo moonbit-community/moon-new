@@ -18,7 +18,7 @@ async test "package assets regenerate, build, and create a runnable project" {
   } else {
     ignore(checked("unzip", ["-q", archive, "-d", source], cwd=repository))
   }
-  for name in ["moon.mod", "README.mbt.md", "LICENSE"] {
+  for name in ["moon.mod", "README.md", "LICENSE"] {
     assert_eq(
       @fs.read_file(source + "/" + name).binary(),
       @fs.read_file(repository + "/" + name).binary(),
