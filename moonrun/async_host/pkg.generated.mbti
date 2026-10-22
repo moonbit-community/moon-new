@@ -2,6 +2,7 @@
 package "moonbit-community/moonrun/async_host"
 
 import {
+  "moonbit-community/moonrun/async_host/tls",
   "moonbit-community/moonrun/async_sys",
   "moonbit-community/moonrun/process",
   "moonbit-community/moonrun/resource",
@@ -22,6 +23,7 @@ pub(all) struct AddrInfo {
 }
 
 pub(all) struct AsyncHost {
+  tls_connections : Map[Int64, @tls.Connection]
   handles : @handles.Handles
   stdio : @stdio.Stdio
   buffers : Map[Int64, FixedArray[Byte]]

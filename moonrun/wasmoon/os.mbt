@@ -7,13 +7,6 @@ fn Context::common_async_import(
 ) -> Array[@wasm.Value] raise {
   let host = self.runtime.async_host
   match name {
-    "tls/connection/free" => {
-      // Releasing a null connection requires no TLS session implementation.
-      guard i64(args[0]) == self.runtime.handles.null_handle else {
-        raise @sys.Operation("Badf")
-      }
-      []
-    }
     "env_util/getpid" => [I32(@sys.native_pid())]
     "runtime/get_platform" =>
       [
@@ -139,7 +132,6 @@ fn common_async_signature(name : String) -> @wasm.FuncType? {
     ReadOnlyArray[@wasm.ValueType],
     ReadOnlyArray[@wasm.ValueType],
   ) = match name {
-    "tls/connection/free" => ([I64], [])
     "env_util/getpid" => ([], [I32])
     "runtime/get_platform"
     | "runtime/init_WSA"

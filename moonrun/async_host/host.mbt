@@ -1,5 +1,6 @@
 ///|
 pub(all) struct AsyncHost {
+  tls_connections : Map[Int64, @tls.Connection]
   handles : @handles.Handles
   stdio : @stdio.Stdio
   buffers : Map[Int64, FixedArray[Byte]]
@@ -29,6 +30,7 @@ pub fn AsyncHost::AsyncHost(
   {
     handles,
     stdio,
+    tls_connections: Map([]),
     buffers: Map([]),
     buses: Map([]),
     fds: Map([]),
@@ -89,4 +91,8 @@ pub fn AsyncHost::close(self : AsyncHost) -> Unit {
   }
   self.fds.clear()
   self.buffers.clear()
+  for _, connection in self.tls_connections {
+    connection.close()
+  }
+  self.tls_connections.clear()
 }

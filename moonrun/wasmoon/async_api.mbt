@@ -15,6 +15,7 @@ priv enum AsyncImport {
   Socket
   Dns
   SocketOption
+  Tls
   Common
 }
 
@@ -64,8 +65,6 @@ fn async_import_spec(name : String) -> (AsyncImport, @wasm.FuncType)? {
     "c_buffer/c_buffer_get" => ([I64, I32], [I32])
     "c_buffer/blit_to_c" | "c_buffer/blit_from_c" =>
       ([I64, I32, I32, I32, I32], [])
-    // FIXME: Support TLS imports once async exposes a transport-independent
-    // TLS session API: https://github.com/moonbitlang/async/issues/668
     _ => {
       let families : Array[(AsyncImport, (String) -> @wasm.FuncType?)] = [
         (Legacy, legacy_async_signature),
@@ -78,6 +77,7 @@ fn async_import_spec(name : String) -> (AsyncImport, @wasm.FuncType)? {
         (Socket, socket_signature),
         (Dns, dns_signature),
         (SocketOption, socket_option_signature),
+        (Tls, tls_signature),
         (Common, common_async_signature),
       ]
       for (family, lookup) in families {
@@ -126,6 +126,7 @@ fn Context::async_import(
     Socket => self.windows_socket_import(caller, name, args)
     Dns => self.dns_import(caller, name, args)
     SocketOption => self.socket_option_import(caller, name, args)
+    Tls => self.tls_import(caller, name, args)
     Common => self.common_async_import(caller, name, args)
   }
 }

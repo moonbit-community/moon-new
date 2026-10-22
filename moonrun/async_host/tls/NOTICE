@@ -1,0 +1,5 @@
+The OpenSSL dynamic symbol loader is adapted from moonbitlang/async 0.22.4, src/tls/openssl.c (Apache-2.0).
+The scoped TLS transport, pending configuration and status conventions follow Rust moonrun, crates/moonrun/src/async_host/tls (Apache-2.0), at 80b2d6c83a05361ac18b1d4ba878d250ee3de676.
+The Schannel backend uses the same Windows APIs as moonbitlang/async 0.22.4, src/tls/schannel.c (Apache-2.0).
+Original copyright notices are retained. TLS libraries are provided by the operating system; no cryptographic library sources are vendored.
+Public test credentials in test_keys/ are copied unchanged from moonbitlang/async at 166a3d84a138732f299242036c22903a6016f84d. They are test fixtures, not production credentials.

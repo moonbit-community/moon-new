@@ -117,6 +117,12 @@ for target in "${targets[@]}"; do
     program="$fixtures/_build/$target/debug/build/async_stdio/async_stdio.wasm"
     "$PWD/_build/native/release/build/moonbit-community/moonrun/acceptance/acceptance.exe" "$program"
 
+    program="$fixtures/_build/$target/debug/build/async_tls/async_tls.wasm"
+    keys="$PWD/moonrun/async_host/tls/test_keys"
+    MOONBIT_ASYNC_CHECK_FD_LEAK=1 moonrun "$program" "$keys" > "$scratch/expected"
+    MOONBIT_ASYNC_CHECK_FD_LEAK=1 "$runner" "$program" "$keys" > "$scratch/actual"
+    cmp "$scratch/expected" "$scratch/actual"
+
     program="$fixtures/_build/$target/debug/build/async_net/async_net.wasm"
     moonrun "$program" > "$scratch/expected"
     "$runner" "$program" > "$scratch/actual"

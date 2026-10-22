@@ -63,6 +63,7 @@ pub fn Runtime::leak_summary(self : Runtime) -> String? {
     .filter(key => !host.stdio_handles.values().contains(key))
     .count()
   let counts = [
+    ("tls_connections", host.tls_connections.length()),
     ("c_buffers", host.buffers.length()),
     ("addr_infos", host.address_info.length()),
     ("io_results", host.io_results.length()),
