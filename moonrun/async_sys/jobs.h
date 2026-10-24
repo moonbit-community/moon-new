@@ -30,9 +30,25 @@ struct sleep_job {
 static
 void free_sleep_job(struct sleep_job *job) {}
 
+static int64_t sleep_clock_ns(void) {
+#ifdef _WIN32
+  LARGE_INTEGER counter, frequency;
+  QueryPerformanceCounter(&counter);
+  QueryPerformanceFrequency(&frequency);
+  return (counter.QuadPart / frequency.QuadPart) * 1000000000LL +
+         (counter.QuadPart % frequency.QuadPart) * 1000000000LL / frequency.QuadPart;
+#else
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return (int64_t)now.tv_sec * 1000000000LL + now.tv_nsec;
+#endif
+}
+
 static int32_t sleep_job_worker(struct sleep_job *job, int32_t *error) {
-  int remaining = job->duration;
-  while (remaining > 0) {
+  int64_t deadline = sleep_clock_ns() + (int64_t)job->duration * 1000000;
+  for (;;) {
+    int64_t remaining = deadline - sleep_clock_ns();
+    if (remaining <= 0) return 0;
     if (moonrun_native_enter_cancellable_region(current_worker)) {
 #ifdef _WIN32
       *error = ERROR_OPERATION_ABORTED;
@@ -41,17 +57,17 @@ static int32_t sleep_job_worker(struct sleep_job *job, int32_t *error) {
 #endif
       return -1;
     }
-    int slice = remaining > 10 ? 10 : remaining;
+    // Keep cancellation responsive without adding each wakeup's latency to
+    // the requested duration.
+    int64_t slice = remaining > 10000000 ? 10000000 : remaining;
 #ifdef _WIN32
-    Sleep(slice);
+    Sleep((DWORD)((slice + 999999) / 1000000));
 #else
-    struct timespec pause = {0, slice * 1000000};
+    struct timespec pause = {0, (long)slice};
     if (nanosleep(&pause, NULL) < 0) { *error = errno; return -1; }
 #endif
     moonrun_native_leave_cancellable_region(current_worker);
-    remaining -= slice;
   }
-  return 0;
 }
 
 MOONBIT_FFI_EXPORT

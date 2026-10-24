@@ -12,6 +12,7 @@ import {
   "Milky2018/wasmoon_runtime/runtime" @vm,
   "Milky2018/wasm_core/types" @wasm,
   "moonbit-community/moonrun/wasmoon",
+  "moonbit-community/moonrun/source_map",
 }
 
 import {

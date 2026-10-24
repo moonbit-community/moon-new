@@ -1,5 +1,6 @@
 import {
   "moonbit-community/moonrun/async_host/tls",
+  "moonbit-community/moonrun/source_map",
   "moonbit-community/moonrun/sqlite",
   "moonbit-community/moonrun/async_host",
   "moonbitlang/core/cmp",

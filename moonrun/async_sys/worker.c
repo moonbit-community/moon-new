@@ -370,7 +370,7 @@ MOONBIT_FFI_EXPORT void moonrun_native_worker_free(struct worker *worker) {
 #ifndef _WIN32
 extern int moonrun_native_safe_write(int, const void *, int);
 #endif
-#include "jobs.inc"
+#include "jobs.h"
 
 #include "operation.h"
 struct owned_io_job {

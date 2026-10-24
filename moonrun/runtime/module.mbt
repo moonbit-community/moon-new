@@ -2,8 +2,10 @@
 /// A validated module. Each run creates fresh guest and host state.
 pub struct Module {
   priv code : @wasm.Module
+  priv bytes : Bytes
   priv name : String
   priv executable : String?
+  priv source_map : @source_map.SourceMap?
 }
 
 ///|
@@ -13,14 +15,19 @@ pub fn Module::from_bytes(
 ) -> Module raise {
   let code = @parser.parse_module(bytes)
   @validator.validate_module(code)
-  { code, name, executable: None, }
+  { code, bytes, name, executable: None, source_map: None, }
 }
 
 ///|
 pub fn Module::load_file(path : String) -> Module raise {
   let executable = @path.Path(path).resolve().to_string()
-  let module_ = Module::from_bytes(@sys.read_file(path), name=path)
-  { ..module_, executable: Some(executable), }
+  let bytes = @sys.read_file(path)
+  let module_ = Module::from_bytes(bytes, name=path)
+  {
+    ..module_,
+    executable: Some(executable),
+    source_map: @source_map.SourceMap::load(path, bytes),
+  }
 }
 
 ///|
@@ -83,7 +90,7 @@ pub fn Module::run(
     control.deliver = None
     state.async_host.shutting_down = true
   }
-  let context = @wasmoon.Context(state, poll=() => {
+  let context = @wasmoon.Context(state, source_map=self.source_map, poll=() => {
     if control.poll is Some(poll) &&
       poll() is Some(signal) &&
       !control.send_signal(signal) {
@@ -95,6 +102,7 @@ pub fn Module::run(
   let result = context.execute(
     linker,
     self.code,
+    self.bytes,
     selection,
     stack_size=stack_size * 1024L,
     no_stack_trace~,

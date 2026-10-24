@@ -3,6 +3,7 @@ pub fn Context::execute(
   self : Context,
   linker : @vm.Linker,
   code : @wasm.Module,
+  bytes : Bytes,
   selection : Array[(String, Array[(UInt32, UInt32)])]?,
   stack_size~ : Int64 = 16L * 1024L * 1024L,
   no_stack_trace~ : Bool = false,
@@ -13,7 +14,7 @@ pub fn Context::execute(
   let instance = @executor.instantiate_module_with_imports_unstarted(
     store, code, imports,
   )
-  let jit = prepare_jit(code, store, instance, stack_size)
+  let jit = prepare_jit(code, bytes, store, instance, stack_size)
   defer jit.close()
   jit.install_hostcall_dispatcher(store, instance)
   let outcome : @termination.RunOutcome = try {
@@ -49,7 +50,7 @@ pub fn Context::execute(
       }
       match exit {
         Some(code) => Exited(code)
-        None => Trapped(format_trap(error, jit, no_stack_trace))
+        None => Trapped(self.format_trap(error, jit, no_stack_trace))
       }
     }
   }
@@ -70,15 +71,30 @@ fn Context::call(
   args : Array[@wasm.Value],
 ) -> Array[@wasm.Value] raise {
   let mut yielded_at = @wasi.native_clock_gettime_monotonic()
-  let mut outcome = jit.call_core_func_resumable(store, instance, index, args) catch {
+  let mut outcome = jit.call_core_func_resumable_with_exception(
+    store, instance, index, args,
+  ) catch {
     @jit_context.Exit(code) => raise @vm.HostExit(code)
     @jit_context.HostInvocation(error) => raise error
     error => raise error
   }
   for ;; {
     match outcome {
-      NativeCoreReturned(values) => return values
-      NativeCoreSuspended(reason, continuation) => {
+      Returned(values) => return values
+      Thrown(exception) => {
+        defer exception.close()
+        guard store.borrow_rooted_value(exception) is ExnRef(index) else {
+          raise @vm.UncaughtException
+        }
+        let exception = store.get_exn(index)
+        if Some(exception.tag_addr) == self.host_exception_tag &&
+          exception.values is [value] &&
+          self.get(value) is HostError(error) {
+          raise error
+        }
+        raise @vm.UncaughtException
+      }
+      Suspended(reason, continuation) => {
         errdefer continuation.cancel()
         match reason {
           CooperativeYield =>
@@ -92,7 +108,7 @@ fn Context::call(
             @sys.sleep(1)
           }
         }
-        outcome = continuation.continue_execution() catch {
+        outcome = continuation.continue_execution_with_exception() catch {
           @jit_context.Exit(code) => raise @vm.HostExit(code)
           @jit_context.HostInvocation(error) => raise error
           error => raise error

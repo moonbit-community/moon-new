@@ -1,6 +1,7 @@
 ///|
 fn prepare_jit(
   code : @wasm.Module,
+  bytes : Bytes,
   store : @vm.Store,
   instance : @vm.ModuleInstance,
   stack_size : Int64,
@@ -19,15 +20,12 @@ fn prepare_jit(
       | RefNullFuncTyped(_)))
     })
   let failure = Ref("JIT compilation failed")
-  guard @compiler.compile_module_to_jit(
-      code,
-      false,
-      false,
-      2,
-      false,
+  // Compile the original binary to preserve source-map instruction offsets.
+  guard @compiler.compile_module(
+      bytes,
+      opt_level=2,
       enable_cancellation=true,
       nan_canonicalization=store.nan_canonicalization,
-      force_subtype_indirect_check=Some(subtype_check),
       on_progress=progress => {
         if progress.message is Some(message) {
           failure.val = message
@@ -35,7 +33,7 @@ fn prepare_jit(
         None
       },
     )
-    is Some((artifact, debug_db)) else {
+    is Some(artifact) else {
     raise @vm.LinkErrorDetail(failure.val)
   }
   let loaded = @compiler.verify_compiled_jit_artifact(artifact)
@@ -44,7 +42,6 @@ fn prepare_jit(
     @jit_context.build_func_signatures(code),
     @jit_context.build_external_imports_for_jit(code, instance, store),
     function_names=@compiler.build_jit_function_names(code),
-    debug_db~,
   )
   errdefer module_.close()
   guard module_.set_cooperative_scheduling(true) &&
@@ -85,7 +82,8 @@ fn prepare_jit(
 }
 
 ///|
-fn format_trap(
+fn Context::format_trap(
+  self : Context,
   error : Error,
   jit : @jit_context.JITModuleContext,
   no_stack_trace : Bool,
@@ -97,11 +95,18 @@ fn format_trap(
   let message = StringBuilder()
   message.write_string(report.message)
   if !no_stack_trace {
-    // FIXME: Wasmoon currently retains at most the trap and one caller frame.
-    // https://github.com/Milky2018/wasmoon/issues/563
     for frame in report.wasm_frames {
+      let location = @source_map.format_frame(
+        frame.func_name,
+        frame.wasm_offset,
+        self.source_map,
+      )
+      let offset = match frame.native_offset {
+        Some(offset) => ", JIT +0x\{offset.to_string(radix=16)}"
+        None => ""
+      }
       message.write_string(
-        "\n    at \{frame.func_name} (func \{frame.func_idx}, JIT +0x\{frame.wasm_offset.to_string(radix=16)})",
+        "\n    \{location} (func \{frame.func_idx}\{offset})",
       )
     }
   }

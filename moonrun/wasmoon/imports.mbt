@@ -4,6 +4,10 @@ fn Context::register(
   linker : @vm.Linker,
   code : @wasm.Module,
 ) -> @vm.Imports raise {
+  let store = linker.get_store()
+  let host_exception_tag = store.alloc_tag({ params: [ExternRef], results: [], })
+  self.host_exception_tag = Some(host_exception_tag)
+  let imports = @vm.Imports(store)
   let exception : @wasm.Module = {
     ..@wasm.Module::empty(),
     types: [@wasm.SubType::func([], [])],
@@ -98,36 +102,57 @@ fn Context::register(
         } else {
           None
         }
-        linker.add_host_func_with_caller(
-          module_name,
-          name,
+        let address = store.alloc_throwing_host_func_with_caller(
           (caller, args) => {
-            match family {
-              Some(family) =>
-                try {
-                  self.progress()
-                  self.async_import(caller, name, args, family)
-                } catch {
-                  error => raise import_error(error)
+            // Polling, cancellation and termination stay outside guest catches.
+            self.progress()
+            try {
+              match family {
+                Some(family) => self.async_import(caller, name, args, family)
+                None => {
+                  let values = self.dispatch_impl(
+                    caller, module_name, name, args,
+                  )
+                  if actual.results.is_empty() {
+                    []
+                  } else {
+                    values
+                  }
                 }
-              None => {
-                let values = self.dispatch(caller, module_name, name, args)
-                if actual.results.is_empty() {
-                  []
-                } else {
-                  values
+              }
+            } catch {
+              error => {
+                let error = import_error(error)
+                // JS string builtins trap; ABI validation and operation errors
+                // throw like the Rust runner's host bindings. Engine resource
+                // failures and process exit are not converted to exceptions.
+                guard module_name != "wasm:js-string" &&
+                  error
+                  is (@vm.TypeMismatch
+                  | @vm.OutOfBoundsMemoryAccess
+                  | @vm.OutOfBoundsArrayAccess
+                  | @vm.LinkErrorDetail(_)
+                  | @vm.AsyncHostError(_)) else {
+                  raise error
                 }
+                let payload = store.root_raw_value(self.put(HostError(error)))
+                defer payload.close()
+                let exception = store.guest_exception(host_exception_tag, [
+                  payload,
+                ])
+                defer exception.close()
+                exception.throw_into_guest()
               }
             }
           },
           func_type=actual,
         )
+        imports.add_func(module_name, name, address)
       }
       _ => raise @vm.UnknownImport(module_name, name)
     }
   }
   let registered_imports = linker.build_imports()
-  let imports = @vm.Imports(linker.get_store())
   for entry in code.imports {
     let value = if entry.mod_name == "wasi_snapshot_preview1" &&
       (entry.name == "fd_read" || entry.name == "fd_write") &&
@@ -151,11 +176,15 @@ fn Context::register(
         ),
       )
     } else {
-      guard registered_imports.resolve(entry.mod_name, entry.name)
-        is Some(value) else {
-        raise @vm.UnknownImport(entry.mod_name, entry.name)
-      }
-      value
+      imports
+      .resolve(entry.mod_name, entry.name)
+      .unwrap_or_else(() => {
+        guard registered_imports.resolve(entry.mod_name, entry.name)
+          is Some(value) else {
+          raise @vm.UnknownImport(entry.mod_name, entry.name)
+        }
+        value
+      })
     }
     match value {
       Func(address) => imports.add_func(entry.mod_name, entry.name, address)
@@ -389,24 +418,5 @@ fn import_error(error : Error) -> @vm.RuntimeError {
       @vm.RuntimeError::from_error(error).unwrap_or_else(() => {
         @vm.AsyncHostError("\{error}")
       })
-  }
-}
-
-///|
-fn Context::dispatch(
-  self : Context,
-  caller : @vm.Caller,
-  module_name : String,
-  name : String,
-  args : Array[@wasm.Value],
-) -> Array[@wasm.Value] raise @vm.RuntimeError {
-  // FIXME: Map ABI host exceptions to catchable guest exceptions when Wasmoon
-  // exposes that channel; keep genuine traps separate:
-  // https://github.com/Milky2018/wasmoon/issues/550
-  try {
-    self.progress()
-    self.dispatch_impl(caller, module_name, name, args)
-  } catch {
-    error => raise import_error(error)
   }
 }

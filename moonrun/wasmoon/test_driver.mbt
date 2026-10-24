@@ -37,7 +37,7 @@ fn Context::run_tests(
               "type": "result",
               "file": name,
               "index": index,
-              "message": format_trap(error, jit, no_stack_trace),
+              "message": self.format_trap(error, jit, no_stack_trace),
             }
             self.runtime.stdio.output(
               1,

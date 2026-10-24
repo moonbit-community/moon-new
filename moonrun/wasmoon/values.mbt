@@ -9,6 +9,7 @@ priv enum HostValue {
   ByteReader(FixedArray[Byte], Ref[Int32])
   StringReader(Array[String], Ref[Int32])
   Instant(Int64)
+  HostError(@vm.RuntimeError)
 }
 
 ///|

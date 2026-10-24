@@ -7,22 +7,27 @@ pub struct Context {
   priv mut exit_code : Int32?
   priv mut wasi_context : @wasi.WasiContext?
   priv mut ffi_memory : @vm.Memory?
+  priv mut host_exception_tag : Int32?
   priv filesystem_results : @filesystem.OperationResults
   priv sanitizer_objects : Map[UInt32, UInt32]
+  priv source_map : @source_map.SourceMap?
 }
 
 ///|
 pub fn Context::Context(
   runtime : @state.Runtime,
   poll~ : () -> Unit raise = () => (),
+  source_map~ : @source_map.SourceMap? = None,
 ) -> Context {
   {
     runtime,
+    source_map,
     poll,
     values: [],
     exit_code: None,
     wasi_context: None,
     ffi_memory: None,
+    host_exception_tag: None,
     filesystem_results: @filesystem.OperationResults(),
     sanitizer_objects: Map([]),
   }
