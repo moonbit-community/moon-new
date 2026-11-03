@@ -1,1 +1,0 @@
-Native filesystem, socket and platform primitives are adapted from moonbitlang/async 0.22.4 (Apache-2.0). Original copyright and license notices are retained in each source file. Worker state and ownership are local to each moonrun instance; no MoonBit event loop is used.

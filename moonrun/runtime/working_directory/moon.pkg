@@ -1,9 +1,0 @@
-import {
-  "moonbit-community/moonrun/async_sys" @sys,
-  "moonbitlang/x/path",
-  "moonbitlang/x/path/win32" @winpath,
-}
-
-options(
-  supported_targets: "native",
-)

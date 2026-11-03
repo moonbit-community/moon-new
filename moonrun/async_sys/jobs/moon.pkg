@@ -1,8 +1,0 @@
-import {
-  "moonbit-community/moonrun/async_sys" @sys,
-  "moonbit-community/moonrun/resource",
-}
-
-options(
-  supported_targets: "native",
-)

@@ -1,4 +1,0 @@
-options(
-  supported_targets: "native",
-  "native-stub": [ "pipe.c" ],
-)

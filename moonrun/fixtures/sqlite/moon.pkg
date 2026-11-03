@@ -1,9 +1,0 @@
-import {
-  "moonbitlang/async",
-  "moonbitlang/core/env",
-  "moonbit-community/sqlite3",
-}
-
-pkgtype(kind: "executable")
-
-supported_targets = "-all+wasm"

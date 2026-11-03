@@ -13,9 +13,6 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    env:
-      # Validate the published module independently of other workspace members.
-      MOON_WORK: "off"
     steps:
       - name: Require main branch
         shell: bash
@@ -33,7 +30,6 @@ jobs:
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
       - name: Validate Wasm and the package archive
-        working-directory: moon-new
         shell: bash
         run: |
           moon version --all
@@ -51,7 +47,6 @@ jobs:
             exit 1
           fi
       - name: Publish to Mooncakes
-        working-directory: moon-new
         env:
           MOONCAKES_CREDENTIALS: ${{ secrets.MOONCAKES_MOONBIT_COMMUNITY_TOKEN }}
         shell: bash
