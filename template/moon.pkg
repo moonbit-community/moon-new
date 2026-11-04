@@ -135,7 +135,7 @@ rule(
 
 dev_build(
   rule: "asset_12",
-  input: "assets/.github/workflows/copilot-setup-steps.yml",
+  input: "assets/.github/workflows/stable_check.yml",
   output: "asset_12.generated.mbt",
 )
 

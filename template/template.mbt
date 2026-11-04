@@ -44,7 +44,7 @@ fn inventory() -> Array[Entry] {
     File(path="README.mbt.md", content=@utf8.encode(asset_10), executable=false),
     File(path=".gitignore", content=@utf8.encode(asset_11), executable=false),
     File(
-      path=".github/workflows/copilot-setup-steps.yml",
+      path=".github/workflows/stable_check.yml",
       content=@utf8.encode(asset_12),
       executable=false,
     ),
@@ -58,7 +58,7 @@ fn inventory() -> Array[Entry] {
 }
 
 ///|
-/// Render the pinned template's file names and contents before creating files.
+/// Render the bundled template's file names and contents before creating files.
 pub fn render(
   username : String,
   name : String,
