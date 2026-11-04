@@ -70,11 +70,12 @@ async test "sandbox cleanup removes read-only files without following directory 
 }
 
 ///|
+#derive(Debug)
 struct Output {
   status : Int32
   stdout : String
   stderr : String
-} derive(Debug)
+}
 
 ///|
 async fn command(
