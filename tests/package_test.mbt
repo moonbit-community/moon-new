@@ -31,7 +31,7 @@ async test "package assets regenerate, build, and create a runnable project" {
   let inputs = [
     "moon.pkg", "moon.mod", "cmd/main/moon.pkg", "cmd/main/main.mbt", "{{package}}.mbt",
     "{{package}}_test.mbt", "{{package}}_wbtest.mbt", ".githooks/README.md", ".githooks/pre-commit",
-    "LICENSE", "README.mbt.md", ".gitignore", ".github/workflows/copilot-setup-steps.yml",
+    "LICENSE", "README.mbt.md", ".gitignore", ".github/workflows/stable_check.yml",
     "AGENTS.md",
   ]
   for path in inputs {

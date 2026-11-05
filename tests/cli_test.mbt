@@ -1,9 +1,9 @@
 ///|
-async test "CLI matches the independent official fixture" {
+async test "CLI matches the independent default template fixture" {
   let s = Sandbox::new()
   defer s.cleanup()
   let fixture = @json.parse(
-    @fs.read_file(root() + "/tests/fixtures/official.json").text(),
+    @fs.read_file(root() + "/tests/fixtures/default.json").text(),
   )
   guard fixture is { "files": Object(expected), "links": Object(links), .. } else {
     fail("invalid fixture")
