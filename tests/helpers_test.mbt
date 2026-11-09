@@ -27,19 +27,21 @@ async fn Sandbox::new() -> Sandbox {
 }
 
 ///|
-async fn Sandbox::cleanup(self : Sandbox) -> Unit {
+async fn Sandbox::cleanup(self : Sandbox) -> Unit nocancel {
   if windows() {
     // Git objects are read-only on Windows. async/fs cannot clear that
     // attribute, so use the system's forced directory removal for fixtures.
-    let (status, stdout, stderr) = @process.collect_output(
-      "powershell.exe",
-      [
-        "-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference = 'Stop'; Remove-Item -LiteralPath $env:MOON_NEW_TEST_CLEANUP -Recurse -Force",
-      ],
-      cwd=root(),
-      extra_env={ "MOON_NEW_TEST_CLEANUP": self.root },
-    )
-    assert_eq(status, 0, msg=stderr.text() + stdout.text())
+    @async.protect_from_cancel(() => {
+      let (status, stdout, stderr) = @process.collect_output(
+        "powershell.exe",
+        [
+          "-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference = 'Stop'; Remove-Item -LiteralPath $env:MOON_NEW_TEST_CLEANUP -Recurse -Force",
+        ],
+        cwd=root(),
+        extra_env={ "MOON_NEW_TEST_CLEANUP": self.root },
+      )
+      assert_eq(status, 0, msg=stderr.text() + stdout.text())
+    })
   } else {
     @fs.rmdir(self.root, recursive=true)
   }
