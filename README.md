@@ -24,6 +24,10 @@ The destination must be absent or completely empty. `--name` overrides the proje
 
 A new Git repository is initialized unless the destination is already inside one. No Git executable is required. `--quiet` hides success messages while keeping warnings and errors.
 
+The bundled starter includes `.github/workflows/stable_check.yml`. On pushes to
+`main` and pull requests, it checks warnings and formatting and runs debug and
+release tests for all targets on Linux, macOS, and Windows.
+
 ## Git templates
 
 Use a public GitHub repository by name or full HTTPS URL:

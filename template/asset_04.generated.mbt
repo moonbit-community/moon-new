@@ -23,7 +23,7 @@ let asset_04 : String =
   #|
   #|license = "Apache-2.0"
   #|
-  #|keywords = []
+  #|keywords = [ ]
   #|
   #|preferred_target = "wasm"
   #|

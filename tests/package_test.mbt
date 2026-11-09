@@ -1,8 +1,9 @@
 ///|
 async test "package assets regenerate, build, and create a runnable project" {
   let repository = root()
-  let temporary = @fs.tmpdir(prefix="moon-new-package-")
-  defer @fs.rmdir(temporary, recursive=true)
+  let sandbox = Sandbox::new()
+  defer sandbox.cleanup()
+  let temporary = sandbox.root
   let build = temporary + "/build"
   ignore(checked("moon", ["package", "--target-dir", build], cwd=repository))
   let archives = @fs.readdir(build + "/publish").filter(name => {
@@ -31,7 +32,7 @@ async test "package assets regenerate, build, and create a runnable project" {
   let inputs = [
     "moon.pkg", "moon.mod", "cmd/main/moon.pkg", "cmd/main/main.mbt", "{{package}}.mbt",
     "{{package}}_test.mbt", "{{package}}_wbtest.mbt", ".githooks/README.md", ".githooks/pre-commit",
-    "LICENSE", "README.mbt.md", ".gitignore", ".github/workflows/copilot-setup-steps.yml",
+    "LICENSE", "README.mbt.md", ".gitignore", ".github/workflows/stable_check.yml",
     "AGENTS.md",
   ]
   for path in inputs {
@@ -75,7 +76,10 @@ async test "package assets regenerate, build, and create a runnable project" {
       cwd=temporary,
     ),
   )
-  ignore(checked("moon", ["check"], cwd=destination))
+  ignore(checked("moon", ["check", "--deny-warn"], cwd=destination))
+  ignore(checked("git", ["add", "."], cwd=destination))
+  ignore(checked("moon", ["fmt"], cwd=destination))
+  ignore(checked("git", ["diff", "--exit-code"], cwd=destination))
   ignore(checked("moon", ["test"], cwd=destination))
   assert_eq(
     checked("moon", ["run", "cmd/main"], cwd=destination).trim().to_owned(),
