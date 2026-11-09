@@ -3,3 +3,4 @@
 ///|
 let asset_00 : String =
   #|
+  #|

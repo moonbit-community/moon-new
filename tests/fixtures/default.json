@@ -1,5 +1,5 @@
 {
-  "source": "moon 0.1.20260916 (e4f45e4), with the bundled stable CI workflow",
+  "source": "moon 0.1.20260916 (e4f45e4), with the bundled stable CI workflow and normalized manifests",
   "user": "tester",
   "name": "hello",
   "files": {
@@ -15,8 +15,8 @@
     "hello.mbt": "// Main package file for your library code.\n// Put public APIs and shared helpers here.\n// Keep blocks small and focused for easy refactors.\n",
     "hello_test.mbt": "// Blackbox tests run against the package's public API. Use `@hello` to import.\n// Prefer high-level behaviors over implementation details.\n// Run `moon test` to execute and `moon test --update` to refresh snapshots.\n",
     "hello_wbtest.mbt": "// Whitebox tests run within the package scope.\n// Use them to validate internal helpers or invariants.\n// Keep them focused; public behavior belongs in `_test.mbt`.\n",
-    "moon.mod": "// Learn more about moon.mod configuration:\n// https://docs.moonbitlang.com/en/latest/toolchain/moon/module.html\n//\n// To add a dependency, run this command in your terminal:\n//   moon add moonbitlang/x\n//\n// Or manually declare it in `import`, for example:\n// import {\n//   \"moonbitlang/x@0.4.6\",\n// }\n\nname = \"tester/hello\"\n\nversion = \"0.1.0\"\n\nreadme = \"README.mbt.md\"\n\nrepository = \"\"\n\nlicense = \"Apache-2.0\"\n\nkeywords = []\n\npreferred_target = \"wasm\"\n\ndescription = \"\"\n",
-    "moon.pkg": ""
+    "moon.mod": "// Learn more about moon.mod configuration:\n// https://docs.moonbitlang.com/en/latest/toolchain/moon/module.html\n//\n// To add a dependency, run this command in your terminal:\n//   moon add moonbitlang/x\n//\n// Or manually declare it in `import`, for example:\n// import {\n//   \"moonbitlang/x@0.4.6\",\n// }\n\nname = \"tester/hello\"\n\nversion = \"0.1.0\"\n\nreadme = \"README.mbt.md\"\n\nrepository = \"\"\n\nlicense = \"Apache-2.0\"\n\nkeywords = [ ]\n\npreferred_target = \"wasm\"\n\ndescription = \"\"\n",
+    "moon.pkg": "\n"
   },
   "links": {
     "README.md": "README.mbt.md"

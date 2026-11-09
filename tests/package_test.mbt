@@ -75,7 +75,10 @@ async test "package assets regenerate, build, and create a runnable project" {
       cwd=temporary,
     ),
   )
-  ignore(checked("moon", ["check"], cwd=destination))
+  ignore(checked("moon", ["check", "--deny-warn"], cwd=destination))
+  ignore(checked("git", ["add", "."], cwd=destination))
+  ignore(checked("moon", ["fmt"], cwd=destination))
+  ignore(checked("git", ["diff", "--exit-code"], cwd=destination))
   ignore(checked("moon", ["test"], cwd=destination))
   assert_eq(
     checked("moon", ["run", "cmd/main"], cwd=destination).trim().to_owned(),

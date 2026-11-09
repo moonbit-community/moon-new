@@ -2,11 +2,12 @@
 
 The starter files in `assets/` are based on
 [Moon e4f45e4](https://github.com/moonbitlang/moon/blob/e4f45e4/crates/moonbuild/template/moon_new_template.toml),
-with the Copilot setup workflow replaced by `stable_check.yml`. The other assets
-preserve the upstream contents, including empty files and exact final-newline
-behavior. They are Apache-2.0 licensed, as is the source project. `template.mbt`
-preserves the inventory, symlink target, and executable flags. Do not edit
-generated `.mbt` files.
+with the Copilot setup workflow replaced by `stable_check.yml` and the module
+and package manifests normalized for the current formatter. The other assets
+preserve the upstream contents and exact final-newline behavior. They are
+Apache-2.0 licensed, as is the source project. `template.mbt` preserves the
+inventory, symlink target, and executable flags. Do not edit generated `.mbt`
+files.
 
 The CI workflow checks formatting, warnings, and debug/release tests for all
 targets on Linux, macOS, and Windows. Its GitHub Actions expressions are wrapped
