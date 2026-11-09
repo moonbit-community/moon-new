@@ -1,8 +1,9 @@
 ///|
 async test "package assets regenerate, build, and create a runnable project" {
   let repository = root()
-  let temporary = @fs.tmpdir(prefix="moon-new-package-")
-  defer @fs.rmdir(temporary, recursive=true)
+  let sandbox = Sandbox::new()
+  defer sandbox.cleanup()
+  let temporary = sandbox.root
   let build = temporary + "/build"
   ignore(checked("moon", ["package", "--target-dir", build], cwd=repository))
   let archives = @fs.readdir(build + "/publish").filter(name => {
