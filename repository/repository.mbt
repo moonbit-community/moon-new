@@ -45,7 +45,7 @@ pub async fn load(
     _ => None
   }
   if refname is Some(name) {
-    guard valid_ref(name) else {
+    guard @object.check_refname_format(name) else {
       raise @object.GitError::InvalidObject("Invalid Git reference: \{name}")
     }
   }
@@ -54,16 +54,12 @@ pub async fn load(
     let (refs, _, _, symrefs) = @protocol.discover_upload_refs_with_http(
       remote, true, http_get, http_post,
     )
-    let mut selected = revision
-    if refname is Some(name) {
-      for (id, advertised) in refs {
-        if advertised == name {
-          selected = Some(id)
-          break
-        }
-      }
-    } else if selected is None {
-      selected = @protocol.select_default_ref(refs, symrefs).map(pair => pair.1)
+    let selected = match (refname, revision) {
+      (Some(name), _) =>
+        refs.iter().find_first(pair => pair.1 == name).map(pair => pair.0)
+      (None, Some(_)) => revision
+      (None, None) =>
+        @protocol.select_default_ref(refs, symrefs).map(pair => pair.1)
     }
     guard selected is Some(id) else {
       raise @object.GitError::InvalidObject(
@@ -141,14 +137,10 @@ fn read_commit(
     guard tree.obj_type is Tree else {
       raise @object.GitError::InvalidObject("Expected a tree: \{tree_id}")
     }
-    let mut found = None
-    for entry in @repo.parse_tree(tree.data) {
-      if entry.name == component {
-        found = Some(entry)
-        break
-      }
-    }
-    guard found is Some(entry) && @repo.is_tree_mode(entry.mode) else {
+    let entries = @repo.parse_tree(tree.data)
+    guard entries.iter().find_first(entry => entry.name == component)
+      is Some(entry) &&
+      @repo.is_tree_mode(entry.mode) else {
       raise @object.GitError::InvalidObject(
         "Template subdirectory not found: \{components.join("/")}",
       )

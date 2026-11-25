@@ -4,39 +4,31 @@ async fn main {
     "moon-new",
     about="Create a MoonBit project from the default template or a Git repository.",
     flags=[
-      @argparse.FlagArg(
-        "quiet",
-        short='q',
-        long="quiet",
-        about="Hide success output",
-      ),
+      FlagArg("quiet", short='q', long="quiet", about="Hide success output"),
     ],
     options=[
-      @argparse.OptionArg(
+      OptionArg(
         "template",
         long="template",
         about="Public HTTPS URL, local Git repository, or GitHub owner/repo",
       ),
-      @argparse.OptionArg(
+      OptionArg(
         "subdir",
         long="subdir",
         about="Template subdirectory within the repository",
       ),
-      @argparse.OptionArg("branch", long="branch", about="Select a branch"),
-      @argparse.OptionArg("tag", long="tag", about="Select a tag"),
-      @argparse.OptionArg("rev", long="rev", about="Select a full commit hash"),
-      @argparse.OptionArg("user", long="user", about="Module username"),
-      @argparse.OptionArg("name", long="name", about="Project name"),
+      OptionArg("branch", long="branch", about="Select a branch"),
+      OptionArg("tag", long="tag", about="Select a tag"),
+      OptionArg("rev", long="rev", about="Select a full commit hash"),
+      OptionArg("user", long="user", about="Module username"),
+      OptionArg("name", long="name", about="Project name"),
     ],
-    positionals=[
-      @argparse.PositionArg("PATH", num_args=@argparse.ValueRange::single()),
-    ],
+    positionals=[PositionArg("PATH", num_args=@argparse.ValueRange::single())],
   )
   let matches = command.parse() catch {
     error => {
       @stdio.stderr.write("Error: \{error}\n")
-      @sys.exit(2)
-      return
+      @env.exit(2)
     }
   }
   let destination = matches.values["PATH"][0]
@@ -52,8 +44,7 @@ async fn main {
     @stdio.stderr.write(
       "Error: --branch, --tag and --rev are mutually exclusive; repository options require --template\n",
     )
-    @sys.exit(2)
-    return
+    @env.exit(2)
   }
   let quiet = matches.flags.get("quiet").unwrap_or(false)
   let warnings : Array[String] = []
@@ -85,8 +76,7 @@ async fn main {
           )
         _ => @stdio.stderr.write("Error: \{error}\n")
       }
-      @sys.exit(1)
-      return
+      @env.exit(1)
     }
   }
   if !quiet {

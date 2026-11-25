@@ -23,6 +23,9 @@ async fn Sandbox::new() -> Sandbox {
     env[if windows() { key.to_upper() } else { key }] = value
   }
   env["MOON_HOME"] = root + "/moon-home"
+  env["GIT_CONFIG_GLOBAL"] = root + "/gitconfig"
+  env.remove("GIT_CONFIG_COUNT")
+  env.remove("GIT_TEMPLATE_DIR")
   { root, env, }
 }
 

@@ -7,9 +7,7 @@ fn git_directory(
   if @types.RepoFileSystem::is_file(disk, marker) {
     let text = @utf8.decode(@types.RepoFileSystem::read_file(disk, marker)) catch {
       error =>
-        raise @object.GitError::InvalidObject(
-          "Invalid Git directory file \{marker}: \{error}",
-        )
+        raise InvalidObject("Invalid Git directory file \{marker}: \{error}")
     }
     let line = text.trim()
     if line.has_prefix("gitdir: ") {

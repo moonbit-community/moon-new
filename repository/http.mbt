@@ -8,7 +8,7 @@ fn remote_url(source : String) -> String? raise @object.GitError {
       !source.contains("?") &&
       !source.contains("#") &&
       !source.contains("\\") else {
-      raise @object.GitError::ProtocolError(
+      raise ProtocolError(
         "Template source must be an anonymous HTTPS repository URL",
       )
     }
@@ -33,28 +33,9 @@ fn remote_url(source : String) -> String? raise @object.GitError {
     }) {
     return Some("https://github.com/" + source)
   }
-  raise @object.GitError::ProtocolError(
+  raise ProtocolError(
     "Unsupported template source; use a local repository, anonymous HTTPS URL, or owner/repo",
   )
-}
-
-///|
-fn valid_ref(name : String) -> Bool {
-  !name.contains("..") &&
-  !name.contains("@{") &&
-  !name
-  .iter()
-  .any(c => {
-    c <= ' ' || c == '\u007f' || c is ('~' | '^' | ':' | '?' | '*' | '[' | '\\')
-  }) &&
-  name
-  .split("/")
-  .all(part => {
-    !part.is_empty() &&
-    !part.has_prefix(".") &&
-    !part.has_suffix(".") &&
-    !part.has_suffix(".lock")
-  })
 }
 
 ///|
@@ -84,14 +65,11 @@ async fn http_request(
   try {
     let request_headers : @http.Headers = Map([])
     for key, value in headers {
-      request_headers[@http.CaseInsensitiveString(key)] = value
+      request_headers[CaseInsensitiveString(key)] = value
     }
     let (response, data) = @http.request(url, verb, request_headers, body)
     (@types.HttpResponse::new(response.code), data.binary())
   } catch {
-    error =>
-      raise @object.GitError::ProtocolError(
-        "Anonymous HTTPS request failed: \{error}",
-      )
+    error => raise ProtocolError("Anonymous HTTPS request failed: \{error}")
   }
 }

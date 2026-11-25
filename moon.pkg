@@ -1,9 +1,9 @@
 import {
   "moonbit-community/moon-new/project",
   "moonbitlang/core/argparse",
+  "moonbitlang/core/env",
   "moonbitlang/async/stdio",
   "moonbitlang/async/os_error",
-  "moonbitlang/x/sys",
 }
 
 pkgtype(kind: "executable")

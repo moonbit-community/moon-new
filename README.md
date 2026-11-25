@@ -24,6 +24,8 @@ The destination must be absent or completely empty. `--name` overrides the proje
 
 A new Git repository is initialized unless the destination is already inside one. No Git executable is required. `--quiet` hides success messages while keeping warnings and errors.
 
+Git initialization reads `init.defaultBranch` and `init.templateDir` from your global Git config. The initial branch defaults to `main`. Set `GIT_TEMPLATE_DIR` to override the template directory, or set it to an empty string to skip template files. The Git template supplies files for `.git`, such as hooks and `info/exclude`.
+
 The bundled starter includes `.github/workflows/stable_check.yml`. On pushes to
 `main` and pull requests, it checks warnings and formatting and runs debug and
 release tests for all targets on Linux, macOS, and Windows.

@@ -266,7 +266,127 @@ async test "CLI permissions respect the Unix umask" {
 }
 
 ///|
-async test "CLI library initialization is independent of Git command configuration" {
+async test "CLI uses the configured Git branch and repository template without Git on PATH" {
+  let s = Sandbox::new()
+  defer s.cleanup()
+  let template = s.root + "/git template"
+  @fs.mkdir(template + "/hooks", recursive=true)
+  @fs.mkdir(template + "/info")
+  @fs.write_file(template + "/description", "Custom repository description\n")
+  @fs.write_file(template + "/hooks/pre-commit", "#!/bin/sh\nexit 0\n")
+  @fs.write_file(template + "/info/exclude", "local.log\n")
+  @fs.write_file(template + "/config", "[custom]\n  marker = from-template\n")
+  @fs.write_file(template + "/.hidden", "ignored")
+  if !windows() {
+    @fs.chmod(template + "/hooks/pre-commit", 0o755)
+  }
+  let config = s.root + "/gitconfig"
+  @fs.write_file(
+    config, "[init]\n  defaultBranch = \"trunk\" # initial branch\n  templateDir = \"~/git template\"\n",
+  )
+  s.env["HOME"] = s.root
+  s.env["USERPROFILE"] = s.root
+  s.env["PATH"] = ""
+  let result = s.run(["starter", "--user", "tester", "-q"])
+  assert_eq(result.status, 0, msg=result.stderr)
+  s.assert_default_stderr("starter", result)
+  assert_eq(s.read("starter/.git/HEAD"), "ref: refs/heads/trunk\n")
+  assert_eq(
+    s.read("starter/.git/description"),
+    "Custom repository description\n",
+  )
+  assert_eq(s.read("starter/.git/info/exclude"), "local.log\n")
+  assert_eq(s.read("starter/.git/hooks/pre-commit"), "#!/bin/sh\nexit 0\n")
+  let generated_config = s.read("starter/.git/config")
+  assert_true(generated_config.contains("marker = from-template"))
+  assert_true(generated_config.contains("bare = false"))
+  let marker = checked(
+    "git",
+    ["config", "--local", "--get", "custom.marker"],
+    cwd=s.root + "/starter",
+  )
+  assert_eq(marker.trim().to_owned(), "from-template")
+  assert_false(s.exists("starter/.git/.hidden"))
+  if !windows() {
+    assert_true(@fs.can_execute(s.root + "/starter/.git/hooks/pre-commit"))
+  }
+  // As in git init, an empty template override disables template copying.
+  s.env["GIT_TEMPLATE_DIR"] = ""
+  let result = s.run(["no_template", "--user", "tester", "-q"])
+  assert_eq(result.status, 0, msg=result.stderr)
+  assert_false(s.exists("no_template/.git/hooks/pre-commit"))
+}
+
+///|
+async test "CLI gives repository template config precedence over global Git config" {
+  let s = Sandbox::new()
+  defer s.cleanup()
+  let template = s.root + "/git-template"
+  @fs.mkdir(template)
+  @fs.write_file(
+    template + "/config",
+    "[init]\n  defaultBranch = from-template\n",
+  )
+  @fs.write_file(
+    s.root + "/gitconfig",
+    "[init]\n  defaultBranch = from-global\n  templateDir = ../git-template\n",
+  )
+  let result = s.run(["starter", "--user", "tester", "-q"])
+  assert_eq(result.status, 0, msg=result.stderr)
+  s.assert_default_stderr("starter", result)
+  assert_eq(s.read("starter/.git/HEAD"), "ref: refs/heads/from-template\n")
+
+  s.env["GIT_CONFIG_COUNT"] = "1"
+  s.env["GIT_CONFIG_KEY_0"] = "init.defaultBranch"
+  s.env["GIT_CONFIG_VALUE_0"] = "from-env"
+  let result = s.run(["override", "--user", "tester", "-q"])
+  assert_eq(result.status, 0, msg=result.stderr)
+  s.assert_default_stderr("override", result)
+  assert_eq(s.read("override/.git/HEAD"), "ref: refs/heads/from-env\n")
+}
+
+///|
+async test "CLI warns about a missing configured Git template and initializes the repository" {
+  let s = Sandbox::new()
+  defer s.cleanup()
+  @fs.write_file(
+    s.root + "/gitconfig",
+    "[init]\n  defaultBranch = trunk\n  templateDir = ../missing-template\n",
+  )
+  let result = s.run(["starter", "--user", "tester", "-q"])
+  assert_eq(result.status, 0, msg=result.stderr)
+  assert_eq(result.stdout, "")
+  assert_true(result.stderr.contains("Git template directory not found"))
+  assert_true(result.stderr.contains("missing-template"))
+  assert_eq(s.read("starter/.git/HEAD"), "ref: refs/heads/trunk\n")
+}
+
+///|
+async test "CLI reads Git initialization settings from XDG and home config in order" {
+  let s = Sandbox::new()
+  defer s.cleanup()
+  let xdg = s.root + "/config"
+  @fs.mkdir(xdg + "/git", recursive=true)
+  @fs.mkdir(s.root + "/git-template")
+  @fs.write_file(s.root + "/git-template/description", "XDG template\n")
+  @fs.write_file(
+    xdg + "/git/config",
+    "[init]\n  defaultBranch = xdg\n  templateDir = ../git-template\n",
+  )
+  @fs.write_file(s.root + "/.gitconfig", "[init]\n  defaultBranch = home\n")
+  s.env.remove("GIT_CONFIG_GLOBAL")
+  s.env["XDG_CONFIG_HOME"] = xdg
+  s.env["HOME"] = s.root
+  s.env["USERPROFILE"] = s.root
+  let result = s.run(["starter", "--user", "tester", "-q"])
+  assert_eq(result.status, 0, msg=result.stderr)
+  s.assert_default_stderr("starter", result)
+  assert_eq(s.read("starter/.git/HEAD"), "ref: refs/heads/home\n")
+  assert_eq(s.read("starter/.git/description"), "XDG template\n")
+}
+
+///|
+async test "CLI warns about an invalid initial Git branch and keeps the project" {
   let s = Sandbox::new()
   defer s.cleanup()
   s.env["GIT_CONFIG_COUNT"] = "1"
@@ -275,8 +395,8 @@ async test "CLI library initialization is independent of Git command configurati
   let result = s.run(["git_failure", "--user", "tester", "-q"])
   assert_eq(result.status, 0, msg=result.stderr)
   assert_eq(result.stdout, "")
-  s.assert_default_stderr("git_failure", result)
-  assert_eq(s.read("git_failure/.git/HEAD"), "ref: refs/heads/main\n")
+  assert_true(result.stderr.contains("Invalid Git initial branch"))
+  assert_false(s.exists("git_failure/.git"))
   assert_eq(s.read("git_failure/README.mbt.md"), "# tester/git_failure")
 }
 
