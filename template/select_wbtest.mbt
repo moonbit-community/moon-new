@@ -49,12 +49,12 @@ test "Gitignore character groups and escapes select file contents" {
   for (pattern, path, expected) in cases {
     let config : Json = { "include": [pattern] }
     let selected = select([
-      @repository.Entry::{
+      {
         path: "moon.new.json",
         mode: "100644",
         content: @utf8.encode(config.stringify()),
       },
-      @repository.Entry::{ path, mode: "100644", content: b"{{module}}", },
+      { path, mode: "100644", content: b"{{module}}", },
     ])
     assert_eq(selected.length(), 1)
     assert_eq(selected[0].1, expected, msg="\{pattern} against \{path}")
@@ -67,7 +67,7 @@ test "invalid Gitignore patterns report the source pattern" {
     let config : Json = { "include": [pattern] }
     try
       select([
-        @repository.Entry::{
+        {
           path: "moon.new.json",
           mode: "100644",
           content: @utf8.encode(config.stringify()),
