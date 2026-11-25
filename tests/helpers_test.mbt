@@ -150,6 +150,38 @@ async fn Sandbox::exists(self : Sandbox, path : String) -> Bool {
 }
 
 ///|
+/// Default projects may emit one extra warning if their README link is skipped.
+async fn Sandbox::assert_default_stderr(
+  self : Sandbox,
+  destination : String,
+  output : Output,
+  expected~ : String = "",
+) -> Unit {
+  let directory = self.root + "/" + destination
+  if @fs.readdir(directory, include_hidden=true).contains("README.md") {
+    assert_true(
+      @fs.kind(directory + "/README.md", follow_symlink=false) is SymLink,
+    )
+    assert_eq(output.stderr, expected)
+  } else {
+    let link = destination + @path.sep.to_string() + "README.md"
+    assert_true(
+      output.stderr.has_prefix(
+        expected +
+        "Warning: Could not create symbolic link " +
+        link +
+        "; skipping: ",
+      ),
+      msg=output.stderr,
+    )
+    assert_eq(
+      output.stderr.split("\n").to_array().length(),
+      expected.split("\n").to_array().length() + 1,
+    )
+  }
+}
+
+///|
 async fn files(directory : String, prefix~ : String = "") -> Array[String] {
   let result = []
   for name in @fs.readdir(directory, include_hidden=true) {
