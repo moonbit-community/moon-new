@@ -36,11 +36,9 @@ fn parse_rule(pattern : String) -> Rule? raise TemplateError {
   let anchored = chars.get(start) is Some('/')
   let start = if anchored { start + 1 } else { start }
   let directory = chars.length() > start && chars.last() is Some('/')
-  let end = if directory { chars.length() - 1 } else { chars.length() }
-  let end = if directory && end > start && chars[end - 1] == '\\' {
-    end - 1
-  } else {
-    end
+  let mut end = if directory { chars.length() - 1 } else { chars.length() }
+  if directory && end > start && chars[end - 1] == '\\' {
+    end -= 1
   }
   let body = chars[start:end].to_owned()
   let (tokens, _) = parse_glob(body, 0, false) catch {
@@ -138,21 +136,19 @@ fn parse_class(
   }
   let end = scan_start + offset
   let ranges : Array[(Char, Char)] = []
-  let pending_range = for i in first..<end; pending_range = false {
+  let mut pending_range = false
+  for i in first..<end {
     let c = chars[i]
     if c == '-' && !ranges.is_empty() && !pending_range {
-      continue true
-    }
-    if pending_range {
+      pending_range = true
+    } else if pending_range {
       let low = ranges[ranges.length() - 1].0
       guard low <= c else { raise TemplateError("Reversed character range") }
       ranges[ranges.length() - 1] = (low, c)
+      pending_range = false
     } else {
       ranges.push((c, c))
     }
-    continue false
-  } nobreak {
-    pending_range
   }
   if pending_range {
     ranges.push(('-', '-'))
@@ -191,7 +187,8 @@ fn consume(
   text : Bytes,
   initial : Set[Int32],
 ) -> Set[Int32] {
-  for token in tokens; positions = initial {
+  let mut positions = initial
+  for token in tokens {
     let next : Set[Int32] = Set([])
     for pos in positions {
       match token {
@@ -230,13 +227,12 @@ fn consume(
         }
       }
     }
-    if next.is_empty() {
-      break next
+    positions = next
+    if positions.is_empty() {
+      break
     }
-    continue next
-  } nobreak {
-    positions
   }
+  positions
 }
 
 ///|

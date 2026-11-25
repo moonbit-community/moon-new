@@ -114,8 +114,9 @@ fn read_commit(
   components : Array[String],
   get : (@object.ObjectId) -> @object.PackObject raise,
 ) -> Array[Entry] raise {
+  let mut commit = get(id)
   let seen : Set[@object.ObjectId] = Set([])
-  let commit = for commit = get(id); commit.obj_type is Tag; {
+  while commit.obj_type is Tag {
     guard !seen.contains(commit.id) else {
       raise @object.GitError::InvalidObject("Cyclic annotated tag: \{id}")
     }
@@ -125,15 +126,13 @@ fn read_commit(
         "Invalid annotated tag: \{commit.id}",
       )
     }
-    continue get(target)
-  } nobreak {
-    commit
+    commit = get(target)
   }
   guard commit.obj_type is Commit else {
     raise @object.GitError::InvalidObject("Expected a commit: \{id}")
   }
-  let root_tree = @repo.parse_commit(commit.data).tree
-  let tree_id = for component in components; tree_id = root_tree {
+  let mut tree_id = @repo.parse_commit(commit.data).tree
+  for component in components {
     let tree = get(tree_id)
     guard tree.obj_type is Tree else {
       raise @object.GitError::InvalidObject("Expected a tree: \{tree_id}")
@@ -146,9 +145,7 @@ fn read_commit(
         "Template subdirectory not found: \{components.join("/")}",
       )
     }
-    continue entry.id
-  } nobreak {
-    tree_id
+    tree_id = entry.id
   }
   let entries = []
   read_tree(tree_id, "", get, entries)

@@ -35,24 +35,20 @@ fn inferred_name(destination : String) -> String {
   let has_root_or_prefix = @path.Path(destination).is_absolute() ||
     has_windows_drive(destination) ||
     (@path.sep == '\\' && destination is ['/' | '\\', ..])
-  let path = if has_root_or_prefix {
+  let mut path = if has_root_or_prefix {
     destination
   } else {
     join_path(@env.current_dir().unwrap_or(""), destination)
   }
   // Rust Components ignores trailing `.` components, but not `..`.
-  let basename = for current = path {
-    let path = @path.Path(current)
-    let basename = path.basename()
-    if basename != "." {
-      break basename
-    }
-    let parent = path.dirname().to_string()
-    if parent == current {
+  while @path.Path(path).basename() == "." {
+    let parent = @path.Path(path).dirname().to_string()
+    if parent == path {
       return "hello"
     }
-    continue parent
+    path = parent
   }
+  let basename = @path.Path(path).basename()
   if basename.is_empty() || basename == ".." {
     return "hello"
   }

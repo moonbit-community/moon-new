@@ -19,20 +19,21 @@ fn select(
   entries : Array[@repository.Entry],
   warnings~ : Array[String] = [],
 ) -> Array[(@repository.Entry, Bool)] raise {
-  let fields = for entry in entries {
-    if entry.path == "moon.new.json" {
-      guard entry.mode == "100644" || entry.mode == "100755" else {
-        raise TemplateError("moon.new.json must be an ordinary file")
-      }
-      let value = @json.parse(@utf8.decode(entry.content)) catch {
-        error => raise TemplateError("Could not parse moon.new.json: \{error}")
-      }
-      guard value is Object(object) else {
-        raise TemplateError("moon.new.json must contain an object")
-      }
-      break object
+  let config_entry = entries
+    .iter()
+    .find_first(entry => entry.path == "moon.new.json")
+  let fields = if config_entry is Some(entry) {
+    guard entry.mode == "100644" || entry.mode == "100755" else {
+      raise TemplateError("moon.new.json must be an ordinary file")
     }
-  } nobreak {
+    let value = @json.parse(@utf8.decode(entry.content)) catch {
+      error => raise TemplateError("Could not parse moon.new.json: \{error}")
+    }
+    guard value is Object(object) else {
+      raise TemplateError("moon.new.json must contain an object")
+    }
+    object
+  } else {
     Map([])
   }
   let config : Map[String, Array[String]] = Map([])
