@@ -25,22 +25,21 @@ pub async fn initialize(
   let home = git_home()
   let config = read_init_config(disk, home)
   let overrides = read_init_overrides()
-  let template = match @env.get_env_var("GIT_TEMPLATE_DIR") {
-    Some(path) => Some(path)
-    None => {
-      let configured = match overrides.get("templatedir") {
-        None => config.get("templatedir")
-        path => path
+  let template = match
+    (
+      @env.get_env_var("GIT_TEMPLATE_DIR"),
+      overrides.get("templatedir"),
+      config.get("templatedir"),
+    ) {
+    (Some(path), _, _) => Some(path)
+    (_, Some(path), _) | (_, _, Some(path)) =>
+      if home is Some(home) && path.strip_prefix("~/") is Some(relative) {
+        // Preserve path components for the filesystem to resolve.
+        Some("\{home}/\{relative}")
+      } else {
+        Some(path)
       }
-      configured.map(path => {
-        if home is Some(home) && path.strip_prefix("~/") is Some(relative) {
-          // Preserve path components for the filesystem to resolve.
-          "\{home}/\{relative}"
-        } else {
-          path
-        }
-      })
-    }
+    _ => None
   }
   let git_dir = root + "/.git"
   @fs.mkdir(git_dir, permission=0o777)
@@ -59,13 +58,13 @@ pub async fn initialize(
   }
   let config_path = git_dir + "/config"
   // The copied template config takes precedence over global config.
-  let branch = overrides
-    .get("defaultbranch")
-    .unwrap_or_else(() => {
-      read_init_value(disk, config_path, "defaultbranch").unwrap_or(
-        config.get("defaultbranch").unwrap_or("main"),
-      )
-    })
+  let branch = if overrides.get("defaultbranch") is Some(branch) {
+    branch
+  } else if read_init_value(disk, config_path, "defaultbranch") is Some(branch) {
+    branch
+  } else {
+    config.get("defaultbranch").unwrap_or("main")
+  }
   let has_head = @types.RepoFileSystem::is_file(disk, git_dir + "/HEAD")
   guard has_head || @object.check_refname_format("refs/heads/" + branch) else {
     raise @object.GitError::IoError("Invalid Git initial branch: \{branch}")
