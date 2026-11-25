@@ -39,23 +39,6 @@ fn remote_url(source : String) -> String? raise @object.GitError {
 }
 
 ///|
-fn valid_ref(name : String) -> Bool {
-  !name.contains("..") &&
-  !name.contains("@{") &&
-  !name.has_suffix(".") &&
-  !name
-  .iter()
-  .any(c => {
-    c <= ' ' || c == '\u007f' || c is ('~' | '^' | ':' | '?' | '*' | '[' | '\\')
-  }) &&
-  name
-  .split("/")
-  .all(part => {
-    !part.is_empty() && !part.has_prefix(".") && !part.has_suffix(".lock")
-  })
-}
-
-///|
 async fn http_get(
   url : String,
   headers : Map[String, String],

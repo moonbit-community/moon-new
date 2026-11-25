@@ -50,7 +50,7 @@ pub async fn initialize(destination : String) -> Bool {
     }
   }
   let has_head = @types.RepoFileSystem::is_file(disk, git_dir + "/HEAD")
-  guard has_head || valid_ref(branch) else {
+  guard has_head || @object.check_refname_format("refs/heads/" + branch) else {
     raise @object.GitError::IoError("Invalid Git initial branch: \{branch}")
   }
   let config_path = git_dir + "/config"

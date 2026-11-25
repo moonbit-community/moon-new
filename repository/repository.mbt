@@ -45,7 +45,7 @@ pub async fn load(
     _ => None
   }
   if refname is Some(name) {
-    guard valid_ref(name) else {
+    guard @object.check_refname_format(name) else {
       raise @object.GitError::InvalidObject("Invalid Git reference: \{name}")
     }
   }

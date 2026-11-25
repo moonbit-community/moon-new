@@ -35,8 +35,7 @@ async fn main {
   let matches = command.parse() catch {
     error => {
       @stdio.stderr.write("Error: \{error}\n")
-      @sys.exit(2)
-      return
+      @env.exit(2)
     }
   }
   let destination = matches.values["PATH"][0]
@@ -52,8 +51,7 @@ async fn main {
     @stdio.stderr.write(
       "Error: --branch, --tag and --rev are mutually exclusive; repository options require --template\n",
     )
-    @sys.exit(2)
-    return
+    @env.exit(2)
   }
   let quiet = matches.flags.get("quiet").unwrap_or(false)
   let warnings : Array[String] = []
@@ -85,8 +83,7 @@ async fn main {
           )
         _ => @stdio.stderr.write("Error: \{error}\n")
       }
-      @sys.exit(1)
-      return
+      @env.exit(1)
     }
   }
   if !quiet {
