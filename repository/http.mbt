@@ -42,6 +42,7 @@ fn remote_url(source : String) -> String? raise @object.GitError {
 fn valid_ref(name : String) -> Bool {
   !name.contains("..") &&
   !name.contains("@{") &&
+  !name.has_suffix(".") &&
   !name
   .iter()
   .any(c => {
@@ -50,10 +51,7 @@ fn valid_ref(name : String) -> Bool {
   name
   .split("/")
   .all(part => {
-    !part.is_empty() &&
-    !part.has_prefix(".") &&
-    !part.has_suffix(".") &&
-    !part.has_suffix(".lock")
+    !part.is_empty() && !part.has_prefix(".") && !part.has_suffix(".lock")
   })
 }
 
