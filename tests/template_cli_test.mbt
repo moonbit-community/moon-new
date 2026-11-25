@@ -181,8 +181,21 @@ async test "CLI preserves expanded relative, dangling and external symbolic link
     "out", "--template", "./source", "--name", "demo", "--user", "alice",
   ])
   assert_eq(result.status, 0, msg=result.stderr)
-  assert_eq(s.read("out/dir/readme"), "demo")
-  assert_eq(s.read("out/directory/demo.txt"), "demo")
+  for
+    (link, file) in [
+      ("dir/readme", "dir/readme"),
+      ("directory", "directory/demo.txt"),
+    ] {
+    if s.exists("out/" + link) {
+      assert_true(
+        @fs.kind(s.root + "/out/" + link, follow_symlink=false) is SymLink,
+      )
+      assert_eq(s.read("out/" + file), "demo")
+    } else {
+      assert_true(result.stderr.contains("Could not create symbolic link"))
+      assert_true(result.stderr.contains(link))
+    }
+  }
   if !windows() {
     assert_eq(
       checked("readlink", [s.root + "/out/dir/readme"], cwd=s.root)
@@ -207,7 +220,7 @@ async test "CLI preserves expanded relative, dangling and external symbolic link
 }
 
 ///|
-async test "failed symlinks copy generated files and directories and reject unsafe fallback targets" {
+async test "failed symlinks warn without copying or aborting generation" {
   let s = Sandbox::new()
   defer s.cleanup()
   ignore(checked("git", ["init", "-b", "main", "source"], cwd=s.root))
@@ -232,43 +245,53 @@ async test "failed symlinks copy generated files and directories and reject unsa
       "git",
       [
         "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m",
-        "fallback",
+        "unavailable links",
       ],
       cwd=source,
     ),
   )
   @fs.write_file(s.root + "/outside", "keep")
   for name in ["file", "directory", "revisit", "missing", "external", "cycle"] {
-    let result = s.run([
-      "out-" + name,
-      "--template",
-      "./source",
-      "--subdir",
-      name,
-      "--name",
-      "demo",
-      "-q",
-    ])
-    assert_true(result.stderr.contains("copying instead"), msg=name)
-    assert_eq(result.stdout, "")
-    if name == "file" || name == "directory" || name == "revisit" {
-      assert_eq(result.status, 0, msg=result.stderr)
-      let file = if name == "directory" { "link/data" } else { "link" }
-      assert_eq(s.read("out-" + name + "/" + file), "demo")
-      assert_false(
-        @fs.kind(s.root + "/out-" + name + "/link", follow_symlink=false)
-        is SymLink,
+    for quiet in [false, true] {
+      let destination = "out-" + name + (if quiet { "-quiet" } else { "" })
+      let result = s.run(
+        [
+          destination, "--template", "./source", "--subdir", name, "--name", "demo",
+          "--user", "alice",
+        ] +
+        (if quiet { ["-q"] } else { [] }),
       )
-    } else {
-      assert_eq(result.status, 1, msg=name)
-      assert_false(s.exists("out-" + name), msg=name)
+      assert_eq(result.status, 0, msg=result.stderr)
+      assert_true(
+        result.stderr.contains("Could not create symbolic link"),
+        msg=name,
+      )
+      assert_true(result.stderr.contains("skipping"), msg=name)
+      assert_false(result.stderr.contains("copying"), msg=name)
+      if windows() {
+        assert_true(result.stderr.contains("Developer Mode"), msg=name)
+      }
+      if quiet {
+        assert_eq(result.stdout, "")
+      } else {
+        assert_true(result.stdout.contains("Created alice/demo"))
+      }
+      // A directory listing also detects dangling links, unlike exists().
+      assert_false(
+        @fs.readdir(s.root + "/" + destination, include_hidden=true).contains(
+          "link",
+        ),
+        msg=name,
+      )
+      assert_eq(s.read(destination + "/dir/data"), "demo")
+      assert_eq(s.read(destination + "/.git/HEAD"), "ref: refs/heads/main\n")
     }
   }
   assert_eq(s.read("outside"), "keep")
 }
 
 ///|
-async test "case aliases cannot turn symlink fallback into writes outside the destination" {
+async test "case aliases in symbolic links remain output collisions" {
   if windows() {
     return
   }

@@ -69,7 +69,7 @@ name = "{{username}}/{{module}}"
 
 Name root source files `{{module}}.mbt`, `{{module}}_test.mbt`, and `{{module}}_wbtest.mbt`. There is no `package` variable; give subpackages explicit names such as `utils/utils.mbt`. There is no special `.liquid` suffix handling.
 
-Unknown variables, invalid Liquid, paths escaping the destination, and output path collisions fail generation. Symlinks and executable modes are preserved where supported; if symlink creation fails, a copy is attempted using only the generated project's contents.
+Unknown variables, invalid Liquid, paths escaping the destination, and output path collisions fail generation. Symlinks and executable modes are preserved where supported. If symlink creation fails, a warning is emitted and generation continues without that link; its target is not copied. On Windows, enabling Developer Mode or running with administrator privileges may allow symlink creation. This also applies to the bundled starter's `README.md` link to `README.mbt.md`.
 
 ### File selection
 
