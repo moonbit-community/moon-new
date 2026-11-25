@@ -1,7 +1,10 @@
 ///|
 /// Initialize an empty repository unless already inside a working tree.
 /// Read the user's Git initialization settings without invoking Git.
-pub async fn initialize(destination : String) -> Bool {
+pub async fn initialize(
+  destination : String,
+  warnings~ : Array[String] = [],
+) -> Bool {
   let disk = Disk::{ }
   let root = @fs.realpath(destination)
   for current = root {
@@ -21,13 +24,15 @@ pub async fn initialize(destination : String) -> Bool {
   }
   let home = git_home()
   let config = read_init_config(disk, home)
-  let branch = config.get("defaultbranch").unwrap_or("main")
+  let overrides = read_init_overrides()
   let template = match @env.get_env_var("GIT_TEMPLATE_DIR") {
     Some(path) => Some(path)
-    None =>
-      config
-      .get("templatedir")
-      .map(path => {
+    None => {
+      let configured = match overrides.get("templatedir") {
+        None => config.get("templatedir")
+        path => path
+      }
+      configured.map(path => {
         if home is Some(home) && path.strip_prefix("~/") is Some(relative) {
           // Preserve path components for the filesystem to resolve.
           "\{home}/\{relative}"
@@ -35,6 +40,7 @@ pub async fn initialize(destination : String) -> Bool {
           path
         }
       })
+    }
   }
   let git_dir = root + "/.git"
   @fs.mkdir(git_dir, permission=0o777)
@@ -47,13 +53,23 @@ pub async fn initialize(destination : String) -> Bool {
     }
     if @types.RepoFileSystem::is_dir(disk, path) {
       copy_git_template(path, git_dir)
+    } else {
+      warnings.push("Git template directory not found: \{path}")
     }
   }
+  let config_path = git_dir + "/config"
+  // The copied template config takes precedence over global config.
+  let branch = overrides
+    .get("defaultbranch")
+    .unwrap_or_else(() => {
+      read_init_value(disk, config_path, "defaultbranch").unwrap_or(
+        config.get("defaultbranch").unwrap_or("main"),
+      )
+    })
   let has_head = @types.RepoFileSystem::is_file(disk, git_dir + "/HEAD")
   guard has_head || @object.check_refname_format("refs/heads/" + branch) else {
     raise @object.GitError::IoError("Invalid Git initial branch: \{branch}")
   }
-  let config_path = git_dir + "/config"
   let template_config = if @fs.exists(config_path) {
     Some(@fs.read_file(config_path).binary())
   } else {

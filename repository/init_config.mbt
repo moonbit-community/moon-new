@@ -29,11 +29,17 @@ fn read_init_config(disk : Disk, home : String?) -> Map[String, String] {
   let config = Map([])
   for path in files {
     for key in ["defaultbranch", "templatedir"] {
-      if @git.read_config_values(disk, path, "init", key).last() is Some(value) {
-        config[key] = decode_init_value(value)
+      if read_init_value(disk, path, key) is Some(value) {
+        config[key] = value
       }
     }
   }
+  config
+}
+
+///|
+fn read_init_overrides() -> Map[String, String] {
+  let config = Map([])
   if @env.get_env_var("GIT_CONFIG_COUNT") is Some(count) {
     let count = @string.parse_int(count) catch { _ => 0 }
     for index in 0..<count {
@@ -49,6 +55,13 @@ fn read_init_config(disk : Disk, home : String?) -> Map[String, String] {
     }
   }
   config
+}
+
+///|
+// FIXME(bit-vcs/bit#238): Use the strict parser for lookup and validate
+// the template's config before installing it once the parser is released.
+fn read_init_value(disk : Disk, path : String, key : String) -> String? {
+  @git.read_config_values(disk, path, "init", key).last().map(decode_init_value)
 }
 
 ///|

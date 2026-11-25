@@ -292,6 +292,12 @@ async test "CLI uses the configured Git branch and repository template without G
   let generated_config = s.read("starter/.git/config")
   assert_true(generated_config.contains("marker = from-template"))
   assert_true(generated_config.contains("bare = false"))
+  let marker = checked(
+    "git",
+    ["config", "--local", "--get", "custom.marker"],
+    cwd=s.root + "/starter",
+  )
+  assert_eq(marker.trim().to_owned(), "from-template")
   assert_false(s.exists("starter/.git/.hidden"))
   if !windows() {
     assert_true(@fs.can_execute(s.root + "/starter/.git/hooks/pre-commit"))
@@ -301,6 +307,50 @@ async test "CLI uses the configured Git branch and repository template without G
   let result = s.run(["no_template", "--user", "tester", "-q"])
   assert_eq(result.status, 0, msg=result.stderr)
   assert_false(s.exists("no_template/.git/hooks/pre-commit"))
+}
+
+///|
+async test "CLI gives repository template config precedence over global Git config" {
+  let s = Sandbox::new()
+  defer s.cleanup()
+  let template = s.root + "/git-template"
+  @fs.mkdir(template)
+  @fs.write_file(
+    template + "/config",
+    "[init]\n  defaultBranch = from-template\n",
+  )
+  @fs.write_file(
+    s.root + "/gitconfig",
+    "[init]\n  defaultBranch = from-global\n  templateDir = ../git-template\n",
+  )
+  let result = s.run(["starter", "--user", "tester", "-q"])
+  assert_eq(result.status, 0, msg=result.stderr)
+  assert_eq(result.stderr, "")
+  assert_eq(s.read("starter/.git/HEAD"), "ref: refs/heads/from-template\n")
+
+  s.env["GIT_CONFIG_COUNT"] = "1"
+  s.env["GIT_CONFIG_KEY_0"] = "init.defaultBranch"
+  s.env["GIT_CONFIG_VALUE_0"] = "from-env"
+  let result = s.run(["override", "--user", "tester", "-q"])
+  assert_eq(result.status, 0, msg=result.stderr)
+  assert_eq(result.stderr, "")
+  assert_eq(s.read("override/.git/HEAD"), "ref: refs/heads/from-env\n")
+}
+
+///|
+async test "CLI warns about a missing configured Git template and initializes the repository" {
+  let s = Sandbox::new()
+  defer s.cleanup()
+  @fs.write_file(
+    s.root + "/gitconfig",
+    "[init]\n  defaultBranch = trunk\n  templateDir = ../missing-template\n",
+  )
+  let result = s.run(["starter", "--user", "tester", "-q"])
+  assert_eq(result.status, 0, msg=result.stderr)
+  assert_eq(result.stdout, "")
+  assert_true(result.stderr.contains("Git template directory not found"))
+  assert_true(result.stderr.contains("missing-template"))
+  assert_eq(s.read("starter/.git/HEAD"), "ref: refs/heads/trunk\n")
 }
 
 ///|
