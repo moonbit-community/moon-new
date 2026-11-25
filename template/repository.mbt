@@ -97,9 +97,8 @@ fn validate_paths(entries : Array[Entry]) -> Unit raise TemplateError {
         "Output path collision: \{path} is also a directory for \{child}",
       )
     }
-    let mut parent = ""
-    for i in 0..<(components.length() - 1) {
-      parent = if parent.is_empty() {
+    for i in 0..<(components.length() - 1); parent = "" {
+      let parent = if parent.is_empty() {
         components[i]
       } else {
         parent + "/" + components[i]
@@ -110,6 +109,7 @@ fn validate_paths(entries : Array[Entry]) -> Unit raise TemplateError {
         )
       }
       directories[parent] = path
+      continue parent
     }
     paths.add(path)
   }

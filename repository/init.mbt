@@ -4,8 +4,7 @@
 pub async fn initialize(destination : String) -> Bool {
   let disk = Disk::{ }
   let root = @fs.realpath(destination)
-  let mut current = root
-  while true {
+  for current = root {
     if git_directory(disk, current) is Some((git_dir, false)) &&
       @types.RepoFileSystem::is_file(disk, git_dir + "/HEAD") &&
       @types.RepoFileSystem::is_dir(
@@ -18,7 +17,7 @@ pub async fn initialize(destination : String) -> Bool {
     if parent == current || parent.is_empty() {
       break
     }
-    current = parent
+    continue parent
   }
   let home = git_home()
   let config = read_init_config(disk, home)
@@ -29,8 +28,9 @@ pub async fn initialize(destination : String) -> Bool {
       config
       .get("templatedir")
       .map(path => {
-        if home is Some(home) && path.has_prefix("~/") {
-          home + path[1:].to_owned()
+        if home is Some(home) && path.strip_prefix("~/") is Some(relative) {
+          // Preserve path components for the filesystem to resolve.
+          "\{home}/\{relative}"
         } else {
           path
         }

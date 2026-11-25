@@ -36,9 +36,11 @@ fn parse_rule(pattern : String) -> Rule? raise TemplateError {
   let anchored = chars.get(start) is Some('/')
   let start = if anchored { start + 1 } else { start }
   let directory = chars.length() > start && chars.last() is Some('/')
-  let mut end = if directory { chars.length() - 1 } else { chars.length() }
-  if directory && end > start && chars[end - 1] == '\\' {
-    end -= 1
+  let end = if directory { chars.length() - 1 } else { chars.length() }
+  let end = if directory && end > start && chars[end - 1] == '\\' {
+    end - 1
+  } else {
+    end
   }
   let body = chars[start:end].to_owned()
   let (tokens, _) = parse_glob(body, 0, false) catch {
@@ -62,40 +64,36 @@ fn parse_glob(
   group : Bool,
 ) -> (Array[Glob], Int32) raise TemplateError {
   let tokens = []
-  let mut i = start
-  while i < chars.length() {
+  for i = start; i < chars.length(); i = i + 1 {
     match chars[i] {
-      '}' | ',' if group => break
+      '}' | ',' if group => break (tokens, i)
       '}' => raise TemplateError("Unopened alternation")
       '{' => {
         let branches = []
-        i += 1
-        while true {
-          let (branch, end) = parse_glob(chars, i, true)
+        let next = for branch_start = i + 1 {
+          let (branch, end) = parse_glob(chars, branch_start, true)
           if !branch.is_empty() {
             branches.push(branch)
           }
           guard end < chars.length() else {
             raise TemplateError("Unclosed alternation")
           }
-          i = end + 1
           if chars[end] == '}' {
-            break
+            break end + 1
           }
+          continue end + 1
         }
         tokens.push(Alternatives(branches))
+        continue next
       }
       '\\' => {
         guard i + 1 < chars.length() else {
           raise TemplateError("Dangling escape")
         }
         tokens.push(Literal(@utf8.encode(chars[i + 1].to_string())))
-        i += 2
+        continue i + 2
       }
-      '?' => {
-        tokens.push(Any)
-        i += 1
-      }
+      '?' => tokens.push(Any)
       '*' =>
         if chars.get(i + 1) is Some('*') &&
           (i == start || chars[i - 1] == '/') &&
@@ -106,27 +104,24 @@ fn parse_glob(
           ) {
           if chars.get(i + 2) is Some('/') {
             tokens.push(TreePrefix)
-            i += 3
+            continue i + 3
           } else {
             tokens.push(Tree)
-            i += 2
+            continue i + 2
           }
         } else {
           tokens.push(Star)
-          i += 1
         }
       '[' => {
         let (token, end) = parse_class(chars, i)
         tokens.push(token)
-        i = end
+        continue end
       }
-      c => {
-        tokens.push(Literal(@utf8.encode(c.to_string())))
-        i += 1
-      }
+      c => tokens.push(Literal(@utf8.encode(c.to_string())))
     }
+  } nobreak {
+    (tokens, i)
   }
-  (tokens, i)
 }
 
 ///|
@@ -136,33 +131,28 @@ fn parse_class(
 ) -> (Glob, Int32) raise TemplateError {
   let negated = chars.get(start + 1) is Some('!' | '^')
   let first = start + (if negated { 2 } else { 1 })
-  let mut end = first
-  if chars.get(end) is Some(']') {
-    end += 1
-  }
-  while end < chars.length() && chars[end] != ']' {
-    end += 1
-  }
+  let scan_start = if chars.get(first) is Some(']') { first + 1 } else { first }
   // Gitignore treats an unclosed class as a literal '['.
-  if end == chars.length() {
+  guard chars[scan_start:].search(']') is Some(offset) else {
     return (Literal(b"["), start + 1)
   }
+  let end = scan_start + offset
   let ranges : Array[(Char, Char)] = []
-  let mut i = first
-  let mut pending_range = false
-  while i < end {
+  let pending_range = for i in first..<end; pending_range = false {
     let c = chars[i]
     if c == '-' && !ranges.is_empty() && !pending_range {
-      pending_range = true
-    } else if pending_range {
+      continue true
+    }
+    if pending_range {
       let low = ranges[ranges.length() - 1].0
       guard low <= c else { raise TemplateError("Reversed character range") }
       ranges[ranges.length() - 1] = (low, c)
-      pending_range = false
     } else {
       ranges.push((c, c))
     }
-    i += 1
+    continue false
+  } nobreak {
+    pending_range
   }
   if pending_range {
     ranges.push(('-', '-'))
@@ -201,8 +191,7 @@ fn consume(
   text : Bytes,
   initial : Set[Int32],
 ) -> Set[Int32] {
-  let mut positions = initial
-  for token in tokens {
+  for token in tokens; positions = initial {
     let next : Set[Int32] = Set([])
     for pos in positions {
       match token {
@@ -241,12 +230,13 @@ fn consume(
         }
       }
     }
-    positions = next
-    if positions.is_empty() {
-      break
+    if next.is_empty() {
+      break next
     }
+    continue next
+  } nobreak {
+    positions
   }
-  positions
 }
 
 ///|

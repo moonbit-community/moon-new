@@ -54,16 +54,12 @@ pub async fn load(
     let (refs, _, _, symrefs) = @protocol.discover_upload_refs_with_http(
       remote, true, http_get, http_post,
     )
-    let mut selected = revision
-    if refname is Some(name) {
-      for (id, advertised) in refs {
-        if advertised == name {
-          selected = Some(id)
-          break
-        }
-      }
-    } else if selected is None {
-      selected = @protocol.select_default_ref(refs, symrefs).map(pair => pair.1)
+    let selected = match (refname, revision) {
+      (Some(name), _) =>
+        refs.iter().find_first(pair => pair.1 == name).map(pair => pair.0)
+      (None, Some(_)) => revision
+      (None, None) =>
+        @protocol.select_default_ref(refs, symrefs).map(pair => pair.1)
     }
     guard selected is Some(id) else {
       raise @object.GitError::InvalidObject(
@@ -118,9 +114,8 @@ fn read_commit(
   components : Array[String],
   get : (@object.ObjectId) -> @object.PackObject raise,
 ) -> Array[Entry] raise {
-  let mut commit = get(id)
   let seen : Set[@object.ObjectId] = Set([])
-  while commit.obj_type is Tag {
+  let commit = for commit = get(id); commit.obj_type is Tag; {
     guard !seen.contains(commit.id) else {
       raise @object.GitError::InvalidObject("Cyclic annotated tag: \{id}")
     }
@@ -130,30 +125,30 @@ fn read_commit(
         "Invalid annotated tag: \{commit.id}",
       )
     }
-    commit = get(target)
+    continue get(target)
+  } nobreak {
+    commit
   }
   guard commit.obj_type is Commit else {
     raise @object.GitError::InvalidObject("Expected a commit: \{id}")
   }
-  let mut tree_id = @repo.parse_commit(commit.data).tree
-  for component in components {
+  let root_tree = @repo.parse_commit(commit.data).tree
+  let tree_id = for component in components; tree_id = root_tree {
     let tree = get(tree_id)
     guard tree.obj_type is Tree else {
       raise @object.GitError::InvalidObject("Expected a tree: \{tree_id}")
     }
-    let mut found = None
-    for entry in @repo.parse_tree(tree.data) {
-      if entry.name == component {
-        found = Some(entry)
-        break
-      }
-    }
-    guard found is Some(entry) && @repo.is_tree_mode(entry.mode) else {
+    let entries = @repo.parse_tree(tree.data)
+    guard entries.iter().find_first(entry => entry.name == component)
+      is Some(entry) &&
+      @repo.is_tree_mode(entry.mode) else {
       raise @object.GitError::InvalidObject(
         "Template subdirectory not found: \{components.join("/")}",
       )
     }
-    tree_id = entry.id
+    continue entry.id
+  } nobreak {
+    tree_id
   }
   let entries = []
   read_tree(tree_id, "", get, entries)

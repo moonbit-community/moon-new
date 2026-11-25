@@ -19,8 +19,7 @@ fn select(
   entries : Array[@repository.Entry],
   warnings~ : Array[String] = [],
 ) -> Array[(@repository.Entry, Bool)] raise {
-  let mut fields : Map[String, Json] = Map([])
-  for entry in entries {
+  let fields = for entry in entries {
     if entry.path == "moon.new.json" {
       guard entry.mode == "100644" || entry.mode == "100755" else {
         raise TemplateError("moon.new.json must be an ordinary file")
@@ -31,9 +30,10 @@ fn select(
       guard value is Object(object) else {
         raise TemplateError("moon.new.json must contain an object")
       }
-      fields = object
-      break
+      break object
     }
+  } nobreak {
+    Map([])
   }
   let config : Map[String, Array[String]] = Map([])
   for key, value in fields {
