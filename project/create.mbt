@@ -143,12 +143,10 @@ pub async fn create(
     // Missing ancestors can initially hide an existing target behind `..`.
     // Recheck its resolved eligibility before writing any template files.
     check_destination(destination)
-    let inventory : Map[String, @template.Entry] = Map([])
     for entry in entries {
       let path = match entry {
         File(path~, ..) | Link(path~, ..) => path
       }
-      inventory[path] = entry
       // Create every parent before any links, so filesystem aliases cannot
       // redirect a later output through a previously generated symlink.
       ensure_directory(
@@ -156,8 +154,7 @@ pub async fn create(
         created,
       )
     }
-    // Write regular files first. Link fallbacks use the inventory even when the
-    // referenced link or directory has not been materialized yet.
+    // Write regular files first so link targets are available when possible.
     for entry in entries {
       if entry is File(path~, content~, executable~) {
         let path = join_path(destination, path)
@@ -166,7 +163,7 @@ pub async fn create(
     }
     for entry in entries {
       if entry is Link(path=relative, target~) {
-        create_link(destination, relative, target, inventory, created, warnings)
+        create_link(destination, relative, target, created, warnings)
       }
     }
   }

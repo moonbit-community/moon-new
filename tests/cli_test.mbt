@@ -10,10 +10,9 @@ async test "CLI matches the independent default template fixture" {
   }
   let result = s.run(["hello", "--user", "tester"])
   assert_eq(result.status, 0, msg=result.stderr)
+  s.assert_default_stderr("hello", result)
   assert_true(result.stdout.contains("Created tester/hello"))
-  let names = expected.keys().to_array() + links.keys().to_array()
-  names.sort()
-  assert_eq(files(s.root + "/hello"), names)
+  let names = expected.keys().to_array()
   for path, content in expected {
     guard content is String(text) else { fail("invalid fixture content") }
     assert_eq(
@@ -24,7 +23,11 @@ async test "CLI matches the independent default template fixture" {
   }
   for path, target in links {
     guard target is String(target) else { fail("invalid fixture link") }
-    if @fs.kind(s.root + "/hello/" + path, follow_symlink=false) is SymLink {
+    if s.exists("hello/" + path) {
+      names.push(path)
+      assert_true(
+        @fs.kind(s.root + "/hello/" + path, follow_symlink=false) is SymLink,
+      )
       assert_eq(
         @fs.realpath(s.root + "/hello/" + path),
         @fs.realpath(s.root + "/hello/" + target),
@@ -38,10 +41,12 @@ async test "CLI matches the independent default template fixture" {
         )
       }
     } else {
-      assert_eq(s.read("hello/" + path), s.read("hello/" + target))
-      assert_true(result.stderr.contains("copying"))
+      assert_true(result.stderr.contains("Could not create symbolic link"))
+      assert_true(result.stderr.contains(path))
     }
   }
+  names.sort()
+  assert_eq(files(s.root + "/hello"), names)
   if !windows() {
     assert_eq(permission(s.root + "/hello/.githooks/pre-commit"), "755")
   }
@@ -66,9 +71,10 @@ async test "CLI credentials and explicit user" {
   assert_false(result.stderr.contains("credentials"))
   let result = s.run(["fallback", "--quiet"])
   assert_eq(result.status, 0, msg=result.stderr)
-  assert_eq(
-    result.stderr,
-    "Warning: Could not read or parse credentials; using default username. Log in again with moon login or pass --user.\n",
+  s.assert_default_stderr(
+    "fallback",
+    result,
+    expected="Warning: Could not read or parse credentials; using default username. Log in again with moon login or pass --user.\n",
   )
   assert_eq(result.stdout, "")
   assert_eq(s.read("fallback/README.mbt.md"), "# username/fallback")
@@ -83,7 +89,7 @@ async test "CLI destinations and quiet output" {
   let result = s.run(["empty", "--user", "tester", "-q"])
   assert_eq(result.status, 0, msg=result.stderr)
   assert_eq(result.stdout, "")
-  assert_eq(result.stderr, "")
+  s.assert_default_stderr("empty", result)
   for (name, hidden) in [("populated", ".DS_Store"), ("repository", ".git")] {
     @fs.mkdir(s.root + "/" + name)
     @fs.write_file(s.root + "/" + name + "/" + hidden, "keep me")
@@ -107,9 +113,10 @@ async test "CLI names and argument forms" {
   assert_eq(s.read("foo.bar/README.mbt.md"), "# 用户𐐀/foo")
   let result = s.run(["override", "--name=sample_test", "--user=tester", "-q"])
   assert_eq(result.status, 0, msg=result.stderr)
-  assert_eq(
-    result.stderr,
-    "Warning: Project names ending in _test or _wbtest may conflict with test file conventions.\n",
+  s.assert_default_stderr(
+    "override",
+    result,
+    expected="Warning: Project names ending in _test or _wbtest may conflict with test file conventions.\n",
   )
   assert_eq(result.stdout, "")
   assert_true(s.exists("override/sample_test.mbt"))
@@ -158,9 +165,10 @@ async test "CLI strict credential schema" {
     } else {
       "Could not read or parse credentials"
     }
-    assert_eq(
-      result.stderr,
-      "Warning: \{message}; using default username. Log in again with moon login or pass --user.\n",
+    s.assert_default_stderr(
+      name,
+      result,
+      expected="Warning: \{message}; using default username. Log in again with moon login or pass --user.\n",
     )
     assert_false(result.stderr.contains("secret"))
     assert_eq(s.read(name + "/README.mbt.md"), "# username/" + name)
@@ -173,7 +181,7 @@ async test "CLI strict credential schema" {
     let name = "absent_\{index}"
     let result = s.run([name, "-q"])
     assert_eq(result.status, 0, msg=result.stderr)
-    assert_eq(result.stderr, "")
+    s.assert_default_stderr(name, result)
     assert_eq(s.read(name + "/README.mbt.md"), "# username/" + name)
   }
 }
@@ -192,7 +200,7 @@ async test "CLI home lookup and unavailable Git" {
   s.env["PATH"] = ""
   let result = s.run(["no_git", "--user", "tester", "-q"])
   assert_eq(result.status, 0, msg=result.stderr)
-  assert_eq(result.stderr, "")
+  s.assert_default_stderr("no_git", result)
   assert_eq(result.stdout, "")
   assert_true(s.exists("no_git/moon.mod"))
   assert_eq(s.read("no_git/.git/HEAD"), "ref: refs/heads/main\n")
@@ -205,7 +213,7 @@ async test "CLI reuses the parent Git repository" {
   ignore(checked("git", ["init", s.root], cwd=s.root))
   let result = s.run(["child", "--user", "tester", "-q"])
   assert_eq(result.status, 0, msg=result.stderr)
-  assert_eq(result.stderr, "")
+  s.assert_default_stderr("child", result)
   assert_false(s.exists("child/.git"))
   assert_true(s.exists(".git"))
 }
@@ -267,7 +275,7 @@ async test "CLI library initialization is independent of Git command configurati
   let result = s.run(["git_failure", "--user", "tester", "-q"])
   assert_eq(result.status, 0, msg=result.stderr)
   assert_eq(result.stdout, "")
-  assert_eq(result.stderr, "")
+  s.assert_default_stderr("git_failure", result)
   assert_eq(s.read("git_failure/.git/HEAD"), "ref: refs/heads/main\n")
   assert_eq(s.read("git_failure/README.mbt.md"), "# tester/git_failure")
 }
